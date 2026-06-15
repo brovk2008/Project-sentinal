@@ -1,0 +1,42 @@
+{
+  "forecasting": {
+    "RandomForest": {
+      "rmse": 1.7748846413157395
+    },
+    "chosen_model": "RandomForest",
+    "chosen_rmse": 1.7749,
+    "std_residuals": 1.774,
+    "training_time_s": 0.7
+  },
+  "hotspot": {
+    "RandomForest": {
+      "f1": 0.18181818181818182
+    },
+    "chosen_model": "RandomForest",
+    "chosen_f1": 0.1818,
+    "training_time_s": 0.2
+  },
+  "network_risk": {
+    "model": "IsolationForest",
+    "min_decision_score": -0.1464,
+    "max_decision_score": 0.1967,
+    "training_time_s": 0.5
+  },
+  "patterns": {
+    "station_inertia": 14.554957423178926,
+    "crime_inertia": 215.07860506402076,
+    "station_clusters": 8,
+    "crime_clusters": 8,
+    "station_rows": 23,
+    "crime_group_rows": 83,
+    "algorithm": "KMeans",
+    "training_time_s": 2.8
+  },
+  "anomaly": {
+    "district_model": "IsolationForest",
+    "crime_spikes_detected": 4,
+    "financial_anomalies_detected": 500,
+    "district_outliers": 1,
+    "training_time_s": 0.2
+  }
+}

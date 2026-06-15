@@ -1,0 +1,9 @@
+{
+  "command": "sh start.sh",
+  "buildPath": ".",
+  "stack": "python_3_9",
+  "memory": 512,
+  "env_variables": {
+    "ENV": "production"
+  }
+}

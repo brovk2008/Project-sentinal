@@ -1,0 +1,15 @@
+{
+  "client": {
+    "source": "frontend/dist"
+  },
+  "appsail": [
+    {
+      "name": "sentinel-backend",
+      "source": "backend"
+    },
+    {
+      "name": "sentinel-test",
+      "source": "sentinel-test"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+import sys
+import os
+# Add the current directory and lib folder to python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import threading
+from routes import heatmap, trends, districts, network, ai, rag
+
+app = FastAPI(
+    title="Project Sentinel API",
+    description="Backend analysis dashboard API for crime data, fraud flows, and communication records.",
+    version="2.0"
+)
+
+# Enable CORS for React frontend and Catalyst domains
+allowed_origins = [
+    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "https://project-sentinel-60073535541.development.catalystserverless.in",
+    "https://sentinel-backend-50042879481.development.catalystappsail.in",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register endpoints
+app.include_router(heatmap.router, prefix="/api/v1/heatmap")
+app.include_router(trends.router, prefix="/api/v1/trends")
+app.include_router(districts.router, prefix="/api/v1/districts")
+app.include_router(network.router, prefix="/api/v1/network")
+app.include_router(ai.router, prefix="/api/v1/ai")
+app.include_router(rag.router, prefix="/api/v1/intelligence")
+
+@app.on_event("startup")
+def warm_cache_on_startup():
+    print("Startup: Minimal deployment mode active. Background warmups bypassed.")
+
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": "Project Sentinel API",
+        "version": "2.0"
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    # Catalyst AppSail provides port via X_ZOHO_CATALYST_LISTEN_PORT
+    port = int(os.getenv("X_ZOHO_CATALYST_LISTEN_PORT", os.getenv("PORT", "9000")))
+    reload = os.getenv("ENV", "development") == "development"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload)
+

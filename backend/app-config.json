@@ -1,0 +1,14 @@
+{
+  "command": "sh start.sh",
+  "buildPath": ".",
+  "stack": "python_3_9",
+  "memory": 2048,
+  "env_variables": {
+    "FRONTEND_URL": "https://project-sentinel-60073535541.development.catalystserverless.in",
+    "DEMO_MODE": "false",
+    "WARMUP_LLM": "false",
+    "ENV": "production",
+    "GROQ_API_KEY": "",
+    "HF_TOKEN": ""
+  }
+}
