@@ -240,14 +240,19 @@ def diagnostic_embeddings_check(q: str = "acid attack"):
             "traceback": traceback.format_exc()
         }
 
-# Enable CORS for React frontend and Catalyst domains
+# Enable CORS for React frontend and local development
+# In production Catalyst AppSail, the Catalyst API Gateway automatically injects the CORS headers 
+# for the hosted client domains. Including them here results in duplicate headers which browsers block.
+is_prod = os.getenv("ENV") == "production"
 allowed_origins = [
-    os.getenv("FRONTEND_URL", "http://localhost:5173"),
     "http://localhost:5173",
     "http://localhost:8000",
-    "https://project-sentinel-60073535541.development.catalystserverless.in",
-    "https://sentinel-backend-50042879481.development.catalystappsail.in",
 ]
+if not is_prod:
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
