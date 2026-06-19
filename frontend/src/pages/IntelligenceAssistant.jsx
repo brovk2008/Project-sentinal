@@ -39,7 +39,14 @@ export default function IntelligenceAssistant() {
     // Check health on load
     fetch(`${API}/health`)
       .then(res => res.json())
-      .then(data => setHealth(data))
+      .then(data => {
+        setHealth({
+          status: data?.status || 'unhealthy',
+          database: data?.database || data?.catalyst_datastore || 'offline',
+          pgvector_extension: data?.pgvector_extension || data?.vector_search || 'missing',
+          ollama_qwen_model: data?.ollama_qwen_model || data?.groq_api || 'offline'
+        })
+      })
       .catch(() => setHealth({
         status: 'unhealthy',
         database: 'offline',
@@ -104,16 +111,16 @@ export default function IntelligenceAssistant() {
         
         let answerText = ''
         let metadata = {
-          mode: data.mode || 'unknown',
-          confidence: data.confidence !== undefined ? data.confidence : 1.0,
-          sources: data.sources || [],
-          analytics_data: data.analytics_data || null
+          mode: data?.mode || 'unknown',
+          confidence: data?.confidence !== undefined ? data.confidence : 1.0,
+          sources: data?.sources || [],
+          analytics_data: data?.analytics_data || null
         }
 
         if (isBriefing) {
-          answerText = data.briefing || ''
+          answerText = data?.briefing || ''
         } else {
-          answerText = data.answer || ''
+          answerText = data?.answer || ''
         }
 
         setMessages(prev => [...prev, {
@@ -162,14 +169,14 @@ export default function IntelligenceAssistant() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>DB:</span>
-              <span style={{ fontSize: 10, color: health.database === 'connected' ? 'var(--success)' : 'var(--critical)', fontWeight: 600 }}>
-                {health.database.toUpperCase()}
+              <span style={{ fontSize: 10, color: (health?.database || 'offline').toLowerCase() === 'connected' || (health?.database || 'offline').toLowerCase() === 'online' ? 'var(--success)' : 'var(--critical)', fontWeight: 600 }}>
+                {(health?.database || 'UNKNOWN').toUpperCase()}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>OLLAMA:</span>
-              <span style={{ fontSize: 10, color: health.ollama_qwen_model === 'available' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
-                {health.ollama_qwen_model === 'available' ? 'ONLINE (QWEN)' : 'OFFLINE (FALLBACK)'}
+              <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>OLLAMA/GROQ:</span>
+              <span style={{ fontSize: 10, color: (health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
+                {(health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'ONLINE' : 'OFFLINE (FALLBACK)'}
               </span>
             </div>
           </div>
@@ -331,17 +338,17 @@ export default function IntelligenceAssistant() {
               padding: '6px 10px', 
               fontSize: 11,
               borderRadius: 3,
-              color: activeMetadata.mode === 'db_analytics_sql' ? 'var(--warning)' : activeMetadata.mode === 'llm_grounded' ? 'var(--success)' : 'var(--text-primary)',
+              color: (activeMetadata?.mode || 'idle') === 'db_analytics_sql' ? 'var(--warning)' : (activeMetadata?.mode || 'idle') === 'llm_grounded' ? 'var(--success)' : 'var(--text-primary)',
               fontWeight: 700
             }}
           >
-            {activeMetadata.mode.toUpperCase() || 'IDLE'}
+            {(activeMetadata?.mode || 'IDLE').toUpperCase()}
           </div>
           <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
-            {activeMetadata.mode === 'db_analytics_sql' && 'Query directly executed as an optimized PostgreSQL analytics query (<1s).'}
-            {activeMetadata.mode === 'llm_grounded' && 'Query processed via hybrid document retrieval and synthesized locally via Qwen2.5-1.5B.'}
-            {activeMetadata.mode === 'fallback_retrieval_only' && 'Ollama offline. Running retrieval-only fallback output with citations.'}
-            {activeMetadata.mode === 'idle' && 'Await directive input to execute routing decision.'}
+            {(activeMetadata?.mode || 'idle') === 'db_analytics_sql' && 'Query directly executed as an optimized PostgreSQL analytics query (<1s).'}
+            {(activeMetadata?.mode || 'idle') === 'llm_grounded' && 'Query processed via hybrid document retrieval and synthesized locally via Qwen2.5-1.5B.'}
+            {(activeMetadata?.mode || 'idle') === 'fallback_retrieval_only' && 'Ollama offline. Running retrieval-only fallback output with citations.'}
+            {(activeMetadata?.mode || 'idle') === 'idle' && 'Await directive input to execute routing decision.'}
           </p>
         </div>
 
@@ -353,17 +360,17 @@ export default function IntelligenceAssistant() {
               fontSize: 24, 
               fontFamily: 'JetBrains Mono, monospace', 
               fontWeight: 800, 
-              color: getConfidenceColor(activeMetadata.confidence) 
+              color: getConfidenceColor(activeMetadata?.confidence) 
             }}>
-              {activeMetadata.confidence !== null ? `${Math.round(activeMetadata.confidence * 100)}%` : '--'}
+              {activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${Math.round(activeMetadata.confidence * 100)}%` : '--'}
             </div>
             
             <div style={{ flex: 1, height: 6, background: 'var(--bg-primary)', borderRadius: 3, border: '1px solid var(--border)', overflow: 'hidden' }}>
               <div 
                 style={{ 
                   height: '100%', 
-                  background: getConfidenceColor(activeMetadata.confidence), 
-                  width: activeMetadata.confidence !== null ? `${activeMetadata.confidence * 100}%` : '0%' 
+                  background: getConfidenceColor(activeMetadata?.confidence), 
+                  width: activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${activeMetadata.confidence * 100}%` : '0%' 
                 }} 
               />
             </div>
@@ -371,23 +378,23 @@ export default function IntelligenceAssistant() {
         </div>
 
         {/* Section 3: Database Analytics Context */}
-        {activeMetadata.analytics_data && (
+        {activeMetadata?.analytics_data && (
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
             <div className="label-xs" style={{ marginBottom: 6 }}>SQL Analytics Payload</div>
             <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 3 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                    {activeMetadata.analytics_data.columns?.map(col => (
+                    {(activeMetadata.analytics_data?.columns || []).map(col => (
                       <th key={col} style={{ padding: '4px 6px', color: 'var(--text-secondary)' }}>{col}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {activeMetadata.analytics_data.data?.map((row, rIdx) => (
+                  {(activeMetadata.analytics_data?.data || []).map((row, rIdx) => (
                     <tr key={rIdx} style={{ borderBottom: '1px solid var(--border)' }}>
-                      {activeMetadata.analytics_data.columns?.map(col => (
-                        <td key={col} className="mono" style={{ padding: '4px 6px', color: 'var(--text-primary)' }}>{String(row[col])}</td>
+                      {(activeMetadata.analytics_data?.columns || []).map(col => (
+                        <td key={col} className="mono" style={{ padding: '4px 6px', color: 'var(--text-primary)' }}>{String(row && col ? row[col] : '')}</td>
                       ))}
                     </tr>
                   ))}
@@ -401,13 +408,13 @@ export default function IntelligenceAssistant() {
         <div style={{ padding: '16px 20px', flex: 1 }}>
           <div className="label-xs" style={{ marginBottom: 8 }}>Retrieved Document Contexts</div>
           
-          {activeMetadata.sources.length === 0 ? (
+          {(activeMetadata?.sources || []).length === 0 ? (
             <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
               No document evidence active for current log.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {activeMetadata.sources.map((src, sIdx) => (
+              {(activeMetadata?.sources || []).map((src, sIdx) => (
                 <div 
                   key={sIdx}
                   style={{
@@ -419,7 +426,7 @@ export default function IntelligenceAssistant() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span className="mono" style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {src}
+                      {(src || 'UNKNOWN')}
                     </span>
                     <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>DOC_{sIdx + 1}</span>
                   </div>

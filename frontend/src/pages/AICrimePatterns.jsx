@@ -15,10 +15,10 @@ function XAIPanel({ item, type }) {
     </div>
   )
 
-  const name = type === 'station' ? item.unit_name : item.crime_group_name
-  const total = type === 'station' ? item.total_firs : item.total_firs
+  const name = type === 'station' ? (item.unit_name || "UNKNOWN") : (item.crime_group_name || "UNKNOWN")
+  const total = type === 'station' ? (item.total_firs || 0) : (item.total_firs || 0)
   const confidence = item.confidence || 0.90
-  const maxImp = Math.max(...(item.feature_importance || []).map(f => f.importance), 0.001)
+  const maxImp = Math.max(...(item.feature_importance || []).map(f => f?.importance || 0), 0.001)
 
   return (
     <div className="ai-sidebar">
@@ -28,7 +28,7 @@ function XAIPanel({ item, type }) {
           {name}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-          Assigned to: {item.cluster_label}
+          Assigned to: {item.cluster_label || "None"}
         </div>
       </div>
 
@@ -39,8 +39,8 @@ function XAIPanel({ item, type }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
               { label: 'Total Volume', value: total?.toLocaleString() },
-              { label: 'Arrest Rate', value: `${item.arrest_rate?.toFixed(1)}%` },
-              { label: 'Conviction Rate', value: `${item.conviction_rate?.toFixed(1)}%` },
+              { label: 'Arrest Rate', value: `${(item.arrest_rate || 0).toFixed(1)}%` },
+              { label: 'Conviction Rate', value: `${(item.conviction_rate || 0).toFixed(1)}%` },
               { label: 'Cluster Confidence', value: `${Math.round(confidence * 100)}%` },
             ].map(m => (
               <div key={m.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -52,16 +52,16 @@ function XAIPanel({ item, type }) {
         </div>
 
         {/* Feature importance */}
-        {item.feature_importance?.length > 0 && (
+        {(item.feature_importance || []).length > 0 && (
           <div>
             <div className="label-xs" style={{ marginBottom: 8 }}>Top Cluster Weights</div>
-            {item.feature_importance.map(f => (
-              <div key={f.feature} className="xai-feature-row">
-                <div className="xai-feature-name" style={{ fontSize: 9 }}>{f.feature}</div>
+            {(item.feature_importance || []).map(f => (
+              <div key={f?.feature || 'unknown'} className="xai-feature-row">
+                <div className="xai-feature-name" style={{ fontSize: 9 }}>{f?.feature || 'Unknown'}</div>
                 <div className="xai-feature-bar-wrap">
-                  <div className="xai-feature-bar" style={{ width: `${(f.importance / maxImp) * 100}%` }} />
+                  <div className="xai-feature-bar" style={{ width: `${((f?.importance || 0) / maxImp) * 100}%` }} />
                 </div>
-                <div className="xai-feature-pct">{Math.round(f.importance * 100)}%</div>
+                <div className="xai-feature-pct">{Math.round((f?.importance || 0) * 100)}%</div>
               </div>
             ))}
           </div>
@@ -71,7 +71,7 @@ function XAIPanel({ item, type }) {
         <div>
           <div className="label-xs" style={{ marginBottom: 6 }}>Cluster Archetype Profile</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {item.explanation}
+            {item.explanation || "No profile details available for this cluster."}
           </div>
         </div>
       </div>
@@ -93,9 +93,10 @@ export default function AICrimePatterns() {
       .then(d => {
         setData(d)
         setLoading(false)
-        if (d.stations?.length > 0) {
-          const firstInCluster = d.stations.find(s => s.cluster === 0)
-          setSelectedItem(firstInCluster || d.stations[0])
+        const stationsList = d?.stations || []
+        if (stationsList.length > 0) {
+          const firstInCluster = stationsList.find(s => s && s.cluster === 0)
+          setSelectedItem(firstInCluster || stationsList[0])
           setSelectedType('station')
         }
       })
@@ -113,27 +114,29 @@ export default function AICrimePatterns() {
   )
   if (error) return <div className="error-banner">ERROR: {error}</div>
 
-  const { cluster_archetypes, stations, crime_groups } = data
+  const cluster_archetypes = data?.cluster_archetypes || {}
+  const stations = data?.stations || []
+  const crime_groups = data?.crime_groups || []
 
   // Compute cluster statistics for Recharts and Cards
-  const clusterCards = Object.entries(cluster_archetypes).map(([clusterIdStr, label]) => {
+  const clusterCards = (Object.entries(cluster_archetypes || {}) || []).map(([clusterIdStr, label]) => {
     const cid = parseInt(clusterIdStr)
-    const matchingStations = stations.filter(s => s.cluster === cid)
-    const matchingCrimes = crime_groups.filter(c => c.cluster === cid)
+    const matchingStations = (stations || []).filter(s => s && s.cluster === cid)
+    const matchingCrimes = (crime_groups || []).filter(c => c && c.cluster === cid)
 
-    const totalFirs = matchingStations.reduce((sum, s) => sum + s.total_firs, 0)
-    const avgArrest = matchingStations.length
-      ? matchingStations.reduce((sum, s) => sum + s.arrest_rate, 0) / matchingStations.length
+    const totalFirs = (matchingStations || []).reduce((sum, s) => sum + (s?.total_firs || 0), 0)
+    const avgArrest = (matchingStations || []).length
+      ? (matchingStations || []).reduce((sum, s) => sum + (s?.arrest_rate || 0), 0) / (matchingStations || []).length
       : 0
-    const avgConvict = matchingStations.length
-      ? matchingStations.reduce((sum, s) => sum + s.conviction_rate, 0) / matchingStations.length
+    const avgConvict = (matchingStations || []).length
+      ? (matchingStations || []).reduce((sum, s) => sum + (s?.conviction_rate || 0), 0) / (matchingStations || []).length
       : 0
 
     return {
       id: cid,
-      label,
-      stationCount: matchingStations.length,
-      crimeCount: matchingCrimes.length,
+      label: label || "UNKNOWN",
+      stationCount: (matchingStations || []).length,
+      crimeCount: (matchingCrimes || []).length,
       totalFirs,
       avgArrest: Math.round(avgArrest * 10) / 10,
       avgConvict: Math.round(avgConvict * 10) / 10
@@ -141,17 +144,17 @@ export default function AICrimePatterns() {
   })
 
   // Selected cluster items
-  const filteredStations = stations.filter(s => s.cluster === selectedCluster)
-  const filteredCrimes = crime_groups.filter(c => c.cluster === selectedCluster)
+  const filteredStations = (stations || []).filter(s => s && s.cluster === selectedCluster)
+  const filteredCrimes = (crime_groups || []).filter(c => c && c.cluster === selectedCluster)
 
   const handleSelectCluster = (cid) => {
     setSelectedCluster(cid)
-    const firstStation = stations.find(s => s.cluster === cid)
+    const firstStation = (stations || []).find(s => s && s.cluster === cid)
     if (firstStation) {
       setSelectedItem(firstStation)
       setSelectedType('station')
     } else {
-      const firstCrime = crime_groups.find(c => c.cluster === cid)
+      const firstCrime = (crime_groups || []).find(c => c && c.cluster === cid)
       if (firstCrime) {
         setSelectedItem(firstCrime)
         setSelectedType('crime')
@@ -165,16 +168,16 @@ export default function AICrimePatterns() {
     <div className="ai-layout">
       {/* Archetype cluster selector grid */}
       <div className="cluster-grid">
-        {clusterCards.map(c => (
+        {(clusterCards || []).map(c => (
           <div
-            key={c.id}
-            className={`cluster-card ${selectedCluster === c.id ? 'active' : ''}`}
-            onClick={() => handleSelectCluster(c.id)}
+            key={c?.id}
+            className={`cluster-card ${selectedCluster === c?.id ? 'active' : ''}`}
+            onClick={() => handleSelectCluster(c?.id)}
           >
-            <div className="cluster-label" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{c.label}</div>
-            <div className="cluster-count">{c.stationCount} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>stations</span></div>
+            <div className="cluster-label" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{c?.label}</div>
+            <div className="cluster-count">{c?.stationCount} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>stations</span></div>
             <div className="cluster-sub">
-              Arr {c.avgArrest}% · Con {c.avgConvict}%
+              Arr {c?.avgArrest || 0}% · Con {c?.avgConvict || 0}%
             </div>
           </div>
         ))}
@@ -208,7 +211,7 @@ export default function AICrimePatterns() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="label-xs">Associated Police Stations</span>
-                <span className="mono" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{filteredStations.length} units</span>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{(filteredStations || []).length} units</span>
               </div>
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 <table className="data-table">
@@ -222,17 +225,17 @@ export default function AICrimePatterns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStations.map(s => (
+                    {(filteredStations || []).map(s => (
                       <tr
-                        key={s.unit_id}
-                        className={selectedItem?.unit_id === s.unit_id && selectedType === 'station' ? 'selected' : ''}
+                        key={s?.unit_id || Math.random()}
+                        className={selectedItem?.unit_id === s?.unit_id && selectedType === 'station' ? 'selected' : ''}
                         onClick={() => { setSelectedItem(s); setSelectedType('station') }}
                       >
-                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 11 }}>{s.unit_name}</td>
-                        <td style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.district_name}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{s.total_firs}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{s.arrest_rate.toFixed(1)}%</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{s.conviction_rate.toFixed(1)}%</td>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 11 }}>{s?.unit_name || 'UNKNOWN'}</td>
+                        <td style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s?.district_name || 'UNKNOWN'}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(s?.total_firs || 0).toLocaleString()}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(s?.arrest_rate || 0).toFixed(1)}%</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(s?.conviction_rate || 0).toFixed(1)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -244,7 +247,7 @@ export default function AICrimePatterns() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="label-xs">Associated Crime Categories</span>
-                <span className="mono" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{filteredCrimes.length} classes</span>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--text-muted)' }}>{(filteredCrimes || []).length} classes</span>
               </div>
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 <table className="data-table">
@@ -257,16 +260,16 @@ export default function AICrimePatterns() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCrimes.map(c => (
+                    {(filteredCrimes || []).map(c => (
                       <tr
-                        key={c.crime_group_name}
-                        className={selectedItem?.crime_group_name === c.crime_group_name && selectedType === 'crime' ? 'selected' : ''}
+                        key={c?.crime_group_name || Math.random()}
+                        className={selectedItem?.crime_group_name === c?.crime_group_name && selectedType === 'crime' ? 'selected' : ''}
                         onClick={() => { setSelectedItem(c); setSelectedType('crime') }}
                       >
-                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 11 }}>{c.crime_group_name}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{c.total_firs.toLocaleString()}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{c.arrest_rate.toFixed(1)}%</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{c.conviction_rate.toFixed(1)}%</td>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 11 }}>{c?.crime_group_name || 'UNKNOWN'}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(c?.total_firs || 0).toLocaleString()}</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(c?.arrest_rate || 0).toFixed(1)}%</td>
+                        <td className="mono" style={{ fontSize: 11 }}>{(c?.conviction_rate || 0).toFixed(1)}%</td>
                       </tr>
                     ))}
                   </tbody>

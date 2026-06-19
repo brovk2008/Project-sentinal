@@ -10,6 +10,7 @@ import AINetworkRisk from './pages/AINetworkRisk.jsx'
 import AICrimePatterns from './pages/AICrimePatterns.jsx'
 import AIAnomalies from './pages/AIAnomalies.jsx'
 import IntelligenceAssistant from './pages/IntelligenceAssistant.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 const PAGES = {
   heatmap:      CrimeHeatmap,
@@ -32,8 +33,15 @@ export default function App() {
     <div className="app-layout">
       <Sidebar active={page} onNavigate={setPage} />
       <div className="main-content">
-        <PageComponent />
+        {page === 'ai-assistant' || page === 'ai-patterns' ? (
+          <ErrorBoundary errorMessage={`${page === 'ai-assistant' ? 'Intelligence Assistant' : 'Crime Patterns'} page encountered a rendering issue.`}>
+            <PageComponent />
+          </ErrorBoundary>
+        ) : (
+          <PageComponent />
+        )}
       </div>
     </div>
   )
 }
+

@@ -14,17 +14,17 @@ function XAIPanel({ item }) {
     </div>
   )
 
-  const maxImp = Math.max(...(item.feature_importance || []).map(f => f.importance), 0.001)
+  const maxImp = Math.max(...(item.feature_importance || []).map(f => f?.importance || 0), 0.001)
 
   return (
     <div className="ai-sidebar">
       <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
         <div className="label-xs">XAI Analysis</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>
-          {item.unit_name}
+          {item.unit_name || 'UNKNOWN'}
         </div>
         <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-          {item.district_name} District
+          {(item.district_name || 'UNKNOWN')} District
         </div>
       </div>
 
@@ -34,8 +34,8 @@ function XAIPanel({ item }) {
           <div className="label-xs" style={{ marginBottom: 8 }}>Prediction Metrics</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
-              { label: 'Hotspot Probability', value: `${(item.probability * 100).toFixed(1)}%` },
-              { label: 'Risk Classification', value: item.risk_level, color: `var(--${item.risk_level.toLowerCase() === 'critical' ? 'critical' : item.risk_level.toLowerCase() === 'high' ? 'warning' : 'text-secondary'})` },
+              { label: 'Hotspot Probability', value: `${((item.probability || 0) * 100).toFixed(1)}%` },
+              { label: 'Risk Classification', value: item.risk_level || 'UNKNOWN', color: `var(--${(item.risk_level || 'UNKNOWN').toLowerCase() === 'critical' ? 'critical' : (item.risk_level || 'UNKNOWN').toLowerCase() === 'high' ? 'warning' : 'text-secondary'})` },
               { label: 'Model Confidence',    value: `${Math.round((item.confidence || 0) * 100)}%` },
             ].map(m => (
               <div key={m.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -52,22 +52,22 @@ function XAIPanel({ item }) {
           <div className="risk-bar-wrap">
             <div
               className={`risk-bar-fill ${item.risk_level === 'CRITICAL' ? 'critical' : item.risk_level === 'HIGH' ? 'warning' : 'success'}`}
-              style={{ width: `${item.probability * 100}%` }}
+              style={{ width: `${(item.probability || 0) * 100}%` }}
             />
           </div>
         </div>
 
         {/* Feature importance */}
-        {item.feature_importance?.length > 0 && (
+        {(item.feature_importance || []).length > 0 && (
           <div>
             <div className="label-xs" style={{ marginBottom: 8 }}>Feature Importance</div>
-            {item.feature_importance.map(f => (
-              <div key={f.feature} className="xai-feature-row">
-                <div className="xai-feature-name">{f.feature}</div>
+            {(item.feature_importance || []).map(f => (
+              <div key={f?.feature || 'unknown'} className="xai-feature-row">
+                <div className="xai-feature-name">{f?.feature || 'Unknown'}</div>
                 <div className="xai-feature-bar-wrap">
-                  <div className="xai-feature-bar" style={{ width: `${(f.importance / maxImp) * 100}%` }} />
+                  <div className="xai-feature-bar" style={{ width: `${((f?.importance || 0) / maxImp) * 100}%` }} />
                 </div>
-                <div className="xai-feature-pct">{Math.round(f.importance * 100)}%</div>
+                <div className="xai-feature-pct">{Math.round((f?.importance || 0) * 100)}%</div>
               </div>
             ))}
           </div>
@@ -77,7 +77,7 @@ function XAIPanel({ item }) {
         <div>
           <div className="label-xs" style={{ marginBottom: 6 }}>AI Explanation</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            {item.explanation}
+            {item.explanation || 'No explanation available.'}
           </div>
         </div>
       </div>
@@ -101,10 +101,11 @@ export default function AIHotspots() {
     fetch(`${API}/hotspots/emerging`)
       .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
       .then(d => {
-        setData(d)
+        const list = d || []
+        setData(list)
         setLoading(false)
-        if (d.length > 0) {
-          setSelected(d[0])
+        if (list.length > 0) {
+          setSelected(list[0])
         }
       })
       .catch(e => {
@@ -142,15 +143,16 @@ export default function AIHotspots() {
 
   // Update map markers when data changes
   useEffect(() => {
-    if (!mapInstance.current || !layersRef.current || data.length === 0) return
+    if (!mapInstance.current || !layersRef.current || (data || []).length === 0) return
 
     layersRef.current.clearLayers()
 
-    data.forEach(h => {
+    (data || []).forEach(h => {
+      if (!h) return
       const color = h.risk_level === 'CRITICAL' ? 'var(--critical)' : h.risk_level === 'HIGH' ? 'var(--warning)' : 'var(--success)'
-      const radius = 2000 + h.probability * 5000 // meters
+      const radius = 2000 + (h.probability || 0) * 5000 // meters
 
-      const circle = L.circle([h.latitude, h.longitude], {
+      const circle = L.circle([h.latitude || 14.5, h.longitude || 76.5], {
         color: color,
         fillColor: color,
         fillOpacity: 0.3,
@@ -160,9 +162,9 @@ export default function AIHotspots() {
 
       circle.bindTooltip(`
         <div style="font-family: Inter, sans-serif; padding: 4px; font-size: 11px;">
-          <div style="font-weight: 700; color: #fff;">${h.unit_name}</div>
-          <div style="color: #9CA3AF; margin-top: 2px;">District: ${h.district_name}</div>
-          <div style="color: ${color}; font-weight: 600; margin-top: 4px;">Risk: ${h.risk_level} (${Math.round(h.probability * 100)}%)</div>
+          <div style="font-weight: 700; color: #fff;">${h.unit_name || 'UNKNOWN'}</div>
+          <div style="color: #9CA3AF; margin-top: 2px;">District: ${h.district_name || 'UNKNOWN'}</div>
+          <div style="color: ${color}; font-weight: 600; margin-top: 4px;">Risk: ${h.risk_level || 'UNKNOWN'} (${Math.round((h.probability || 0) * 100)}%)</div>
         </div>
       `, { direction: 'top', opacity: 0.9 })
 
@@ -177,7 +179,7 @@ export default function AIHotspots() {
   // Center map on selected hotspot
   useEffect(() => {
     if (!mapInstance.current || !selected) return
-    mapInstance.current.setView([selected.latitude, selected.longitude], 11, { animate: true })
+    mapInstance.current.setView([selected.latitude || 14.5, selected.longitude || 76.5], 11, { animate: true })
   }, [selected])
 
   if (loading) return (
@@ -188,9 +190,9 @@ export default function AIHotspots() {
   )
   if (error) return <div className="error-banner">ERROR: {error}</div>
 
-  const filteredData = data.filter(h =>
-    h.unit_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    h.district_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredData = (data || []).filter(h =>
+    h && ((h.unit_name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+    (h.district_name || '').toLowerCase().includes((searchQuery || '').toLowerCase()))
   )
 
   return (
@@ -199,20 +201,20 @@ export default function AIHotspots() {
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Top Emerging Hotspots</div>
-          <div className="kpi-value">{data.length}</div>
+          <div className="kpi-value">{(data || []).length}</div>
           <div className="kpi-sub">Police stations analysed</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Critical Risk Zones</div>
           <div className="kpi-value" style={{ color: 'var(--critical)' }}>
-            {data.filter(h => h.risk_level === 'CRITICAL').length}
+            {(data || []).filter(h => h && h.risk_level === 'CRITICAL').length}
           </div>
           <div className="kpi-sub">Probability &gt; 80%</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">High Risk Zones</div>
           <div className="kpi-value" style={{ color: 'var(--warning)' }}>
-            {data.filter(h => h.risk_level === 'HIGH').length}
+            {(data || []).filter(h => h && h.risk_level === 'HIGH').length}
           </div>
           <div className="kpi-sub">Probability 50% - 80%</div>
         </div>
@@ -262,7 +264,8 @@ export default function AIHotspots() {
                 </tr>
               </thead>
               <tbody>
-                {filteredData.map(h => {
+                {(filteredData || []).map(h => {
+                  if (!h) return null
                   const badgeClass = h.risk_level === 'CRITICAL' ? 'badge-critical' : h.risk_level === 'HIGH' ? 'badge-warning' : 'badge-neutral'
                   return (
                     <tr
@@ -270,22 +273,22 @@ export default function AIHotspots() {
                       className={selected?.unit_id === h.unit_id ? 'selected' : ''}
                       onClick={() => setSelected(h)}
                     >
-                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{h.unit_name}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{h.district_name}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{h.unit_name || 'UNKNOWN'}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{h.district_name || 'UNKNOWN'}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <div className="risk-bar-wrap" style={{ width: 40 }}>
                             <div
                               className={`risk-bar-fill ${h.risk_level === 'CRITICAL' ? 'critical' : h.risk_level === 'HIGH' ? 'warning' : 'success'}`}
-                              style={{ width: `${h.probability * 100}%` }}
+                              style={{ width: `${(h.probability || 0) * 100}%` }}
                             />
                           </div>
-                          <span className="mono" style={{ fontSize: 10 }}>{Math.round(h.probability * 100)}%</span>
+                          <span className="mono" style={{ fontSize: 10 }}>{Math.round((h.probability || 0) * 100)}%</span>
                         </div>
                       </td>
                       <td>
                         <span className={`badge ${badgeClass}`} style={{ fontSize: 8 }}>
-                          {h.risk_level}
+                          {h.risk_level || 'UNKNOWN'}
                         </span>
                       </td>
                     </tr>
