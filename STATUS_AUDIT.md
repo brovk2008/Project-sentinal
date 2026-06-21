@@ -63,3 +63,65 @@ All unit and security integration tests pass cleanly in **154.06s**:
    * **Resolution Control**: Provide a batch-approval screen to let analysts approve/reject all AI-proposed relations at once.
 3. **Component Refactoring / Code Splitting**:
    * **Scope**: Extract panel states, tab views, and the command palette from the monolithic `CaseWorkspace.jsx` into standalone memoized hooks and contexts, preventing resizing actions from triggering network graph re-renders.
+
+---
+
+## 6. Part 3: Connections Board Fixes & Deployed Catalyst Verification (2026-06-21)
+
+This section documents the fixes applied to the Connections Board and the verification checklist performed on the live Zoho Catalyst deployment.
+
+### 6.1. Connections Board Fixes & Resolutions
+
+| Issue / Feature | Root Cause | Fix / Resolution | File:Line Evidence |
+| :--- | :--- | :--- | :--- |
+| **Canvas Node Drag Jumping & Stuck Mouse** | Stale closure bug where event handlers in `useEffect` and `handleNodeMouseDown` were recreated with old nodes/pan/zoom states, coupled with lack of distance threshold. | Refactored drag, pan, and draw state variables to `useRef`. Added a **3px drag-distance threshold** so micro-movements aren't treated as drags. Added **`requestAnimationFrame` (RAF) throttling** to node coordinates updates. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L56) |
+| **Live Update Drag Interruptions** | Graph data updates from background SSE streams arriving during active user dragging/drawing reset positions. | Implemented a `deferredGraphData` buffer ref. Incoming stream updates are deferred if `isInteracting` is true, and automatically applied when user finishes dragging/drawing. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L90) |
+| **Invisible Edge Labels (Dark Theme)** | Label text used `fill: 'var(--text-muted)'` (#555565), which is too close to SVG background (#0b0b0d). | Changed edge label text color to `var(--text-secondary)` (#9a9aaa) which provides much higher contrast. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L342) |
+| **Illegible SVG Text over Lines** | SVG text elements had no backing background layer, making text unreadable when line paths crossed behind them. | Added CSS text outline styling `paintOrder: 'stroke'`, `stroke: 'var(--bg-base)'`, `strokeWidth: '3px'` to all node/edge text, creating a contrast halo. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L345) |
+| **Invisible Text at High Zoom-out** | Text scales down with SVG transform scale. At scale 0.4 (min zoom), text size shrinks to ~3px, making it unreadable. | Applied dynamic **text counter-scaling** (floor of 0.7 / zoom factor) to node names, edge labels, and badges, keeping them legible even at minimum zoom. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L354) |
+| **Redundant Component Re-renders** | CaseWorkspace flex resizes or tab switches caused expensive redraws of the Vis-Network/SVG canvas. | Wrapped exports in custom `React.memo` comparing only `graphData` and `timelineDate` props. Memoized visible nodes and edges using `useMemo`. | [ConnectionsBoard.jsx](file:///c:/Users/techp/Downloads/more%20projects/Project%20Sentinel/frontend/src/components/ConnectionsBoard.jsx#L540) |
+
+### 6.2. Automated Pytest Verification (Backend)
+
+The pytest suite executed cleanly and confirmed the backend APIs are operational:
+
+```text
+scratch/test_zero_trust.py::test_zero_trust_authentication PASSED        [ 33%]
+scratch/test_zero_trust.py::test_zero_trust_input_validation PASSED      [ 66%]
+scratch/test_v2_api.py::test_v2_flow PASSED                              [100%]
+
+================== 3 passed, 2 warnings in 140.57s (0:02:20) ==================
+```
+
+### 6.3. Deployed Live Verification Checklist (Zoho Catalyst)
+
+* **Deployed Web Client URL:** https://project-sentinel-60073535541.development.catalystserverless.in/app/index.html
+* **Deployed AppSail API URL:** https://sentinel-backend-50042879481.development.catalystappsail.in
+
+- [x] **Cases Table & Search**: Cases load properly on landing. Search filtering behaves smoothly.
+- [x] **Case Workspace Layout**: Layout loads cleanly without visual flex overflows or scroll leakage.
+- [x] **Connections Board - Drag/Click**: Left click selects nodes immediately. Dragging tracks the cursor with zero jitter or jumps.
+- [x] **Connections Board - Zoom Readability**: Node labels, edge lines, and text counter-scale at low zoom to remain legible.
+- [x] **Connections Board - Theme Contrasts**: Legibility verified across Light, Ops-Black, and Dark modes.
+- [x] **AI Proposals Rendering**: AI-proposed elements display square dashed borders, dashed links, and high-visibility badges.
+- [x] **Console Errors**: verified zero runtime JS or render errors in console.
+
+### 6.4. Verification Media
+
+Below are screenshots captured during live verification on the deployed Zoho Catalyst server:
+
+#### Case List Scroll & Workspace Layout
+![Project Sentinel Deployed Landing Page](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/sentinel_landing_page_1782050693109.png)
+![Case List Scrolled Down](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/case_list_scroll_down_1782050722892.png)
+![Case List Scrolled Up](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/case_list_scroll_up_1782050728911.png)
+![Case Workspace Layout](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/case_workspace_layout_1782050742475.png)
+
+#### Theme Contrasts & Visibility
+![Connections Board in Dark Theme](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/connections_dark_theme_1782051016933.png)
+![Connections Board in Light Theme](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/connections_light_theme_1782050993766.png)
+![Connections Board in Ops-Black Theme](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/connections_ops_black_theme_1782051005133.png)
+
+#### Canvas Interactions & AI Node Proposals
+![Canvas Smooth Node Dragging](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/connections_ai_nodes_1782051070666.png)
+![Final Click Selection and Hover States](/C:/Users/techp/.gemini/antigravity-ide/brain/1a7227b5-4f89-4489-a2fd-02c5a2d05662/connections_final_click_selection_1782051130264.png)
+
