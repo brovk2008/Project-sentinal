@@ -23,6 +23,45 @@ export default function AICopilotChat({ caseId, onRefreshGraph }) {
     scrollToBottom()
   }, [messages, agentProgress])
 
+  useEffect(() => {
+    const handleTriggerResearch = (e) => {
+      const goal = e.detail?.goal
+      if (goal) {
+        setCurrentGoal(goal)
+        setRunning(true)
+        setMessages(prev => [...prev, { role: 'user', content: goal }])
+        setAgentProgress({ stage: 'starting', message: 'Generating execution plan...' })
+
+        fetch(`${apiBase}/api/v2/cases/${caseId}/agents/plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal })
+        })
+          .then(res => {
+            if (!res.ok) throw new Error('Failed to generate plan')
+            return res.json()
+          })
+          .then(data => {
+            const subtasksWithSelection = (data.subtasks || []).map((sub, index) => ({
+              ...sub,
+              id: index,
+              selected: true
+            }))
+            setProposedSubtasks(subtasksWithSelection)
+            setShowPlanModal(true)
+            setAgentProgress(null)
+          })
+          .catch(err => {
+            setMessages(prev => [...prev, { role: 'assistant', content: `Error generating plan: ${err.message}` }])
+            setRunning(false)
+            setAgentProgress(null)
+          })
+      }
+    }
+    window.addEventListener('trigger-ai-research', handleTriggerResearch)
+    return () => window.removeEventListener('trigger-ai-research', handleTriggerResearch)
+  }, [caseId, apiBase])
+
   const handleSend = async (e) => {
     e.preventDefault()
     if (!input.trim() || running) return

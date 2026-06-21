@@ -485,7 +485,13 @@ export default function CaseWorkspace({ caseId, onBack, onSelectCase }) {
         handleAddEntity({ type, properties: { name }, confidence: 1.0 })
       }
     } else if (cmd.action === 'research') {
-      alert("Focus set. Enter research goal in AI Copilot Chat panel.")
+      const goal = prompt("Enter case research goal (e.g. Analyze transaction anomalies or trace Karnataka cyber crime networks):")
+      if (goal) {
+        setRightVisible(true)
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('trigger-ai-research', { detail: { goal } }))
+        }, 200)
+      }
     } else if (cmd.action === 'rag-chunk') {
       alert(`Source Extract:\n\n"${cmd.text}"`)
     }
@@ -577,7 +583,7 @@ export default function CaseWorkspace({ caseId, onBack, onSelectCase }) {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '2rem', height: '100vh', boxSizing: 'border-box', backgroundColor: 'var(--bg-base)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '2rem', height: '100%', boxSizing: 'border-box', backgroundColor: 'var(--bg-base)' }}>
         <div className="skeleton" style={{ height: '44px', width: '100%' }} />
         <div style={{ display: 'flex', flex: 1, gap: '1rem' }}>
           <div className="skeleton" style={{ width: '260px' }} />
@@ -589,7 +595,7 @@ export default function CaseWorkspace({ caseId, onBack, onSelectCase }) {
   }
 
   return (
-    <div className="case-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)', overflow: 'hidden' }}>
+    <div className="case-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)', overflow: 'hidden' }}>
       
       {/* Top Navigation */}
       <header style={{
@@ -661,7 +667,7 @@ export default function CaseWorkspace({ caseId, onBack, onSelectCase }) {
           {[
             { id: 'canvas', label: 'Canvas' },
             { id: 'map', label: '2D Map' },
-            { id: 'earth', label: '3D Earth' },
+            { id: 'earth', label: '3D Earth (Coming Soon)' },
             { id: 'files', label: 'Documents' },
             { id: 'report', label: 'Reports' },
             { id: 'resolutions', label: 'Resolutions' }

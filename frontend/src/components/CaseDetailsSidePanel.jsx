@@ -25,6 +25,122 @@ export default function CaseDetailsSidePanel({
   const [selectedRelId, setSelectedRelId] = useState('')
   const [isSupports, setIsSupports] = useState(true)
 
+  // States for Entity Research flow
+  const [researching, setResearching] = useState(false)
+  const [researchProgress, setResearchProgress] = useState(null)
+  const [researchResult, setResearchResult] = useState(null)
+  const [proposedSubtasks, setProposedSubtasks] = useState([])
+  const [showPlanChecklist, setShowPlanChecklist] = useState(false)
+  const [currentGoal, setCurrentGoal] = useState('')
+
+  const handleTriggerResearch = async () => {
+    const entityName = entity.properties?.name || entity.properties?.number || entity.properties?.registration || 'node'
+    const goal = `Research entity: "${entityName}" (Type: ${entity.type}, ID: ${entity.id}, Properties: ${JSON.stringify(entity.properties || {})})`
+    
+    setCurrentGoal(goal)
+    setResearching(true)
+    setResearchProgress({ stage: 'planning', message: 'Generating entity research checklist...' })
+    setResearchResult(null)
+    setShowPlanChecklist(false)
+
+    try {
+      const res = await fetch(`${apiBase}/api/v2/cases/${caseId}/agents/plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal })
+      })
+      if (!res.ok) throw new Error('Failed to generate research plan')
+      const data = await res.json()
+      
+      const subtasksWithSelection = (data.subtasks || []).map((sub, index) => ({
+        ...sub,
+        id: index,
+        selected: true
+      }))
+      setProposedSubtasks(subtasksWithSelection)
+      setShowPlanChecklist(true)
+      setResearching(false)
+      setResearchProgress(null)
+    } catch (err) {
+      alert(`Error generating plan: ${err.message}`)
+      setResearching(false)
+      setResearchProgress(null)
+    }
+  }
+
+  const handleExecuteResearchPlan = async () => {
+    setShowPlanChecklist(false)
+    const selectedSubtasks = proposedSubtasks.filter(s => s.selected).map(({ id, selected, ...rest }) => rest)
+    if (selectedSubtasks.length === 0) {
+      alert("No subtasks selected. Research aborted.")
+      setResearching(false)
+      return
+    }
+
+    setResearchProgress({ stage: 'starting', message: 'Executing research pipeline...' })
+    setResearching(true)
+
+    try {
+      const response = await fetch(`${apiBase}/api/v2/cases/${caseId}/agents/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goal: currentGoal,
+          subtasks: selectedSubtasks
+        })
+      })
+      if (!response.ok) throw new Error('API execution request failed')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6).trim()
+            if (!dataStr) continue
+            
+            try {
+              const event = JSON.parse(dataStr)
+              
+              if (event.stage === 'result') {
+                setResearchResult(event.data)
+                setResearching(false)
+                setResearchProgress(null)
+                if (onRefresh) onRefresh()
+              } else if (event.stage === 'error') {
+                alert(`Error during research: ${event.message}`)
+                setResearching(false)
+                setResearchProgress(null)
+              } else {
+                setResearchProgress({
+                  stage: event.stage,
+                  message: event.message,
+                  subtasks: event.subtasks || researchProgress?.subtasks,
+                  subtask_index: event.subtask_index !== undefined ? event.subtask_index : researchProgress?.subtask_index
+                })
+              }
+            } catch (err) {
+              console.error('Failed to parse SSE event:', err)
+            }
+          }
+        }
+      }
+    } catch (err) {
+      alert(`Error executing research: ${err.message}`)
+      setResearching(false)
+      setResearchProgress(null)
+    }
+  }
+
   useEffect(() => {
     if (isRelationship) {
       setEditingLabel(entity.label || '')
@@ -257,6 +373,26 @@ export default function CaseDetailsSidePanel({
   const sourceNodeName = srcNode?.properties?.name || srcNode?.properties?.number || srcNode?.properties?.registration || 'Entity'
   const targetNodeName = tgtNode?.properties?.name || tgtNode?.properties?.number || tgtNode?.properties?.registration || 'Entity'
 
+  const panelTitle = showPlanChecklist 
+    ? 'CONFIRM RESEARCH PLAN' 
+    : researching 
+      ? 'RESEARCH IN PROGRESS' 
+      : researchResult 
+        ? 'RESEARCH FINDINGS' 
+        : isRelationship 
+          ? 'INSPECT RELATIONSHIP' 
+          : 'INSPECT ENTITY'
+
+  const panelSubtitle = showPlanChecklist 
+    ? 'Select investigation subtasks' 
+    : researching 
+      ? 'Agent pipeline running...' 
+      : researchResult 
+        ? 'AI extracted claims & summary' 
+        : isRelationship 
+          ? `${entity.relationship_type} relationship` 
+          : `${entity.type} node details`
+
   return (
     <div style={{
       position: 'absolute',
@@ -281,10 +417,10 @@ export default function CaseDetailsSidePanel({
       }}>
         <div>
           <h3 style={{ margin: 0, color: '#c8814a', fontSize: '1rem' }}>
-            {isRelationship ? 'INSPECT RELATIONSHIP' : 'INSPECT ENTITY'}
+            {panelTitle}
           </h3>
           <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-            {isRelationship ? `${entity.relationship_type} relationship` : `${entity.type} node details`}
+            {panelSubtitle}
           </span>
         </div>
         <button 
@@ -304,9 +440,180 @@ export default function CaseDetailsSidePanel({
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
-        {isRelationship ? (
-          /* RELATIONSHIP VIEW */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {showPlanChecklist ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>
+              Confirm the investigation plan for researching this entity:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {proposedSubtasks.map((sub) => (
+                <label 
+                  key={sub.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.5rem',
+                    padding: '0.6rem',
+                    backgroundColor: '#1f2937',
+                    borderRadius: '4px',
+                    border: '1px solid #374151',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem'
+                  }}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={sub.selected}
+                    onChange={() => {
+                      setProposedSubtasks(prev => prev.map(item => item.id === sub.id ? { ...item, selected: !item.selected } : item))
+                    }}
+                    style={{ marginTop: '0.15rem', accentColor: 'var(--accent)' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    <span style={{ color: 'white', fontWeight: '500' }}>{sub.task}</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--accent)', textTransform: 'uppercase' }}>
+                      {sub.agent_type}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button 
+                onClick={() => { setShowPlanChecklist(false); setResearching(false); }}
+                style={{
+                  flex: 1,
+                  backgroundColor: 'transparent',
+                  border: '1px solid #374151',
+                  color: '#9ca3af',
+                  padding: '0.5rem',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: '600'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleExecuteResearchPlan}
+                style={{
+                  flex: 1,
+                  backgroundColor: 'var(--accent)',
+                  border: 'none',
+                  color: 'white',
+                  padding: '0.5rem',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: '600'
+                }}
+              >
+                Execute
+              </button>
+            </div>
+          </div>
+        ) : researching ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', alignItems: 'center', textAlign: 'center', padding: '2rem 1rem' }}>
+            <div className="loader-ring" style={{ width: '36px', height: '36px' }} />
+            <div style={{ fontSize: '0.85rem', color: 'white', fontWeight: '500' }}>
+              {researchProgress?.message || 'Processing...'}
+            </div>
+            
+            {researchProgress?.subtasks && (
+              <div style={{ width: '100%', fontSize: '0.75rem', display: 'grid', gap: '0.4rem', borderTop: '1px solid #1f2937', paddingTop: '1rem', textAlign: 'left', marginTop: '0.5rem' }}>
+                {researchProgress.subtasks.map((task, sIdx) => {
+                  const isCurrent = researchProgress.subtask_index === sIdx
+                  const isCompleted = researchProgress.subtask_index > sIdx
+                  return (
+                    <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isCompleted ? '#10b981' : isCurrent ? '#c8814a' : '#4b5563' }}>
+                      <span>{isCompleted ? '✓' : isCurrent ? '⚡' : '○'}</span>
+                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '240px' }}>{task.task}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            
+            <button 
+              onClick={() => { setResearching(false); setResearchProgress(null); }}
+              style={{
+                marginTop: '1.5rem',
+                backgroundColor: 'transparent',
+                border: '1px solid #ef4444',
+                color: '#ef4444',
+                padding: '0.4rem 1rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.75rem'
+              }}
+            >
+              Abort Research
+            </button>
+          </div>
+        ) : researchResult ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            <div style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-secondary)', backgroundColor: '#0b0f17', padding: '1rem', borderRadius: '6px', border: '1px solid #1f2937', maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+              {researchResult.briefing}
+            </div>
+
+            {researchResult.findings && researchResult.findings.length > 0 && (
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: '#9ca3af', textTransform: 'uppercase' }}>Extracted Claims</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+                  {researchResult.findings.map((f, idx) => (
+                    <div key={idx} style={{ padding: '0.6rem', backgroundColor: '#1f2937', borderRadius: '4px', border: '1px solid #374151', fontSize: '0.75rem' }}>
+                      <div style={{ color: 'white', marginBottom: '0.25rem' }}>{f.claim}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+                        <span>Src: {f.source}</span>
+                        <span>Conf: {(f.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {researchResult.proposed_entities && (researchResult.proposed_entities.length > 0 || (researchResult.proposed_edges && researchResult.proposed_edges.length > 0)) && (
+              <div style={{
+                padding: '0.85rem',
+                backgroundColor: 'rgba(200, 129, 74, 0.1)',
+                border: '1px solid var(--accent)',
+                borderRadius: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.4rem'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#c8814a', fontWeight: '600' }}>
+                  AI Staged Suggestions ({researchResult.proposed_entities.length} Nodes, {researchResult.proposed_edges?.length || 0} Edges)
+                </div>
+                <p style={{ margin: 0, fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.3' }}>
+                  Inspect dashed copper nodes and lines on the Connections Board to confirm or reject suggestions.
+                </p>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setResearchResult(null)}
+              style={{
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+                color: 'white',
+                padding: '0.5rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                marginTop: '1rem'
+              }}
+            >
+              Back to Details
+            </button>
+          </div>
+        ) : (
+          isRelationship ? (
+            /* RELATIONSHIP VIEW */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {isAIProposed && (
               <div style={{
                 padding: '0.85rem',
@@ -750,7 +1057,7 @@ export default function CaseDetailsSidePanel({
               </div>
             </div>
           </div>
-        )}
+        ))}
 
       </div>
 
@@ -847,7 +1154,7 @@ export default function CaseDetailsSidePanel({
               Save Changes
             </button>
             <button 
-              onClick={() => alert(`Research triggered for entity: ${entity.properties?.name || 'node'}`)}
+              onClick={handleTriggerResearch}
               style={{
                 backgroundColor: '#c8814a',
                 border: 'none',

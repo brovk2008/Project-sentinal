@@ -139,7 +139,7 @@ export default function CaseList({ onSelectCase }) {
   })
 
   return (
-    <div className="case-list-page" style={{ padding: '2rem', color: 'var(--text-primary)' }}>
+    <div className="case-list-page" style={{ padding: '2rem', color: 'var(--text-primary)', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', color: 'var(--accent)', margin: 0 }}>Intelligence Cases</h1>
