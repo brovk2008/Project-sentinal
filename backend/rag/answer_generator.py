@@ -1,12 +1,12 @@
 import os
 from typing import List, Dict, Any
 try:
-    from backend.services.llm import LLMService
+    from backend.services.ai_router import ai_router
 except ImportError:
-    from services.llm import LLMService
+    from services.ai_router import ai_router
 
 def is_groq_available() -> bool:
-    return LLMService.is_available()
+    return ai_router.verify_health("groq")
 
 def generate_answer(question: str, chunks: List[Dict[str, Any]], db_context: str = None) -> Dict[str, Any]:
     """
@@ -47,8 +47,8 @@ def generate_answer(question: str, chunks: List[Dict[str, Any]], db_context: str
     if db_context:
         context_str += f"\n[PostgreSQL Database Analytics Context]\n{db_context}\n"
 
-    # Fast environment key check to avoid redundant GET requests to Groq models endpoint on every query
-    if os.getenv("GROQ_API_KEY"):
+    # Check if either Groq or Gemini is available
+    if ai_router.verify_health("groq") or ai_router.verify_health("gemini"):
         prompt = f"""You are an expert intelligence assistant for Project Sentinel.
 You must answer the user's question using ONLY the provided document and database evidence.
 Every claim or statistic you generate MUST be directly supported by the text in the evidence.
@@ -62,7 +62,7 @@ Evidence:
 Question: {question}
 Answer:"""
 
-        answer_text = LLMService.generate(prompt)
+        answer_text = ai_router.complete(prompt, provider="groq")
         
         if answer_text:
             return {

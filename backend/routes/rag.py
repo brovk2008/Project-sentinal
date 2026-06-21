@@ -36,10 +36,10 @@ def health_check(db = Depends(get_db)):
     import os
     try:
         from backend.services.vector_search import is_vector_search_ready
-        from backend.services.llm import LLMService
+        from backend.services.ai_router import ai_router
     except ImportError:
         from services.vector_search import is_vector_search_ready
-        from services.llm import LLMService
+        from services.ai_router import ai_router
 
     # 1. Datastore Check
     datastore_status = "offline"
@@ -62,8 +62,16 @@ def health_check(db = Depends(get_db)):
     except Exception as e:
         print(f"[Health Check] Filestore offline: {e}")
         
-    # 3. Groq Check
-    groq_status = "available" if LLMService.is_available() else "offline"
+    # 3. Provider Health Check
+    providers = ["groq", "gemini", "hf", "nasa", "google_maps", "mapillary", "indian_kanoon", "firecrawl", "tavily"]
+    provider_status = {}
+    for p in providers:
+        try:
+            is_healthy = ai_router.verify_health(p)
+            provider_status[p] = "available" if is_healthy else "offline"
+        except Exception as e:
+            print(f"[Health Check RAG] Provider {p} check failed: {e}")
+            provider_status[p] = "offline"
     
     # 4. Vector Search Cache Check
     vector_search_status = "ready" if is_vector_search_ready() else "not_ready"
@@ -75,8 +83,17 @@ def health_check(db = Depends(get_db)):
         "status": status,
         "catalyst_datastore": datastore_status,
         "catalyst_filestore": filestore_status,
-        "groq_api": groq_status,
-        "vector_search": vector_search_status
+        "groq_api": provider_status.get("groq", "offline"),
+        "vector_search": vector_search_status,
+        "groq": provider_status.get("groq", "offline"),
+        "gemini": provider_status.get("gemini", "offline"),
+        "hf": provider_status.get("hf", "offline"),
+        "nasa": provider_status.get("nasa", "offline"),
+        "google_maps": provider_status.get("google_maps", "offline"),
+        "mapillary": provider_status.get("mapillary", "offline"),
+        "indian_kanoon": provider_status.get("indian_kanoon", "offline"),
+        "firecrawl": provider_status.get("firecrawl", "offline"),
+        "tavily": provider_status.get("tavily", "offline")
     }
 
 @router.get("/search")
@@ -195,7 +212,12 @@ def briefing_endpoint(req: BriefingRequest):
         
     avg_score = sum([c['score'] for c in chunks]) / len(chunks) if chunks else 0.0
     
-    if is_groq_available():
+    try:
+        from backend.services.ai_router import ai_router
+    except ImportError:
+        from services.ai_router import ai_router
+
+    if ai_router.verify_health("groq") or ai_router.verify_health("gemini"):
         prompt = f"""You are an expert intelligence analyst for Project Sentinel.
 You must compile a formal, highly-detailed intelligence briefing regarding the topic: "{topic}".
 Your briefing must follow this exact structure:
@@ -218,11 +240,7 @@ Confidence Level: {int(avg_score * 100)}%
 Evidence:
 {context_str}
 """
-        try:
-            from backend.services.llm import LLMService
-        except ImportError:
-            from services.llm import LLMService
-        briefing_text = LLMService.generate(prompt)
+        briefing_text = ai_router.complete(prompt, provider="groq")
         
         if briefing_text:
             return {

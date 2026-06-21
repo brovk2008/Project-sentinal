@@ -254,10 +254,15 @@ def trace_fraud_chain(
     # Fetch details for all accounts in paths
     acc_details = {}
     if accounts_to_fetch:
-        # Interpolate IN parameters directly
-        accounts_tuple_str = ", ".join([f"'{a}'" for a in accounts_to_fetch])
+        param_dict = {}
+        placeholders_list = []
+        for idx, val in enumerate(accounts_to_fetch):
+            param_key = f"acc{idx}"
+            placeholders_list.append(f":{param_key}")
+            param_dict[param_key] = val
+        accounts_tuple_str = ", ".join(placeholders_list)
         details_sql = f"SELECT account_number, owner_name, bank_name, risk_score FROM dim_financial_accounts WHERE account_number IN ({accounts_tuple_str});"
-        details_res = db.execute(details_sql).fetchall()
+        details_res = db.execute(details_sql, param_dict).fetchall()
         for r in details_res:
             acc_details[r[0]] = {
                 "owner": r[1],

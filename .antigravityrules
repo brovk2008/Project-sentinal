@@ -1,0 +1,1 @@
+When running CLI tools like catalyst, always use PowerShell chaining and suppress interactive spinners: cmd /c "call catalyst [args] < NUL" ; exit

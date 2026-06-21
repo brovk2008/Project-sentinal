@@ -193,7 +193,27 @@ def train_and_evaluate():
     scaler_station = StandardScaler()
     X_scaled_station = scaler_station.fit_transform(X_station)
 
-    n_clusters_station = min(N_CLUSTERS, len(station_df))
+    # Validate optimal K for Stations using Silhouette and Elbow analysis
+    from sklearn.metrics import silhouette_score
+    best_k_station = 2
+    best_sil_station = -1.0
+    station_silhouettes = {}
+    station_inertias = {}
+    
+    k_range_station = range(2, min(12, len(station_df)))
+    for k in k_range_station:
+        km = KMeans(n_clusters=k, random_state=42, n_init=5)
+        labels = km.fit_predict(X_scaled_station)
+        sil = float(silhouette_score(X_scaled_station, labels))
+        station_silhouettes[k] = sil
+        station_inertias[k] = float(km.inertia_)
+        if sil > best_sil_station:
+            best_sil_station = sil
+            best_k_station = k
+            
+    print(f"\n[Validation] Optimal K for Station Clustering by Silhouette: {best_k_station} (score: {best_sil_station:.4f})")
+
+    n_clusters_station = best_k_station
     kmeans_station = KMeans(n_clusters=n_clusters_station, random_state=42, n_init=10)
     station_df['cluster'] = kmeans_station.fit_predict(X_scaled_station)
     inertia_station = float(kmeans_station.inertia_)
@@ -216,7 +236,26 @@ def train_and_evaluate():
     scaler_crime = StandardScaler()
     X_scaled_crime = scaler_crime.fit_transform(X_crime)
 
-    n_clusters_crime = min(N_CLUSTERS, len(crime_df))
+    # Validate optimal K for Crime Groups using Silhouette and Elbow analysis
+    best_k_crime = 2
+    best_sil_crime = -1.0
+    crime_silhouettes = {}
+    crime_inertias = {}
+    
+    k_range_crime = range(2, min(12, len(crime_df)))
+    for k in k_range_crime:
+        km = KMeans(n_clusters=k, random_state=42, n_init=5)
+        labels = km.fit_predict(X_scaled_crime)
+        sil = float(silhouette_score(X_scaled_crime, labels))
+        crime_silhouettes[k] = sil
+        crime_inertias[k] = float(km.inertia_)
+        if sil > best_sil_crime:
+            best_sil_crime = sil
+            best_k_crime = k
+            
+    print(f"[Validation] Optimal K for Crime Group Clustering by Silhouette: {best_k_crime} (score: {best_sil_crime:.4f})\n")
+
+    n_clusters_crime = best_k_crime
     kmeans_crime = KMeans(n_clusters=n_clusters_crime, random_state=42, n_init=10)
     crime_df['cluster'] = kmeans_crime.fit_predict(X_scaled_crime)
     inertia_crime = float(kmeans_crime.inertia_)

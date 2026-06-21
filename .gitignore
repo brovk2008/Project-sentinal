@@ -116,3 +116,7 @@ deploy.log
 etl_run.log
 ollama.log
 run.txt
+for v2/Important details.txt
+Important details.txt
+frontend/.env
+*.bak

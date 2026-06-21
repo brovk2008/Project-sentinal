@@ -1,53 +1,50 @@
-# 🛡️ Project Sentinel: Cloud-Native Crime Intelligence & Geospatial Analytics Platform
+# Project Sentinel
 
-[![Zoho Catalyst AppSail](https://img.shields.io/badge/Zoho%20Catalyst-AppSail-006FEE?style=for-the-badge)](https://www.zoho.com/catalyst/)
-[![Zoho Catalyst Data Store](https://img.shields.io/badge/Zoho%20Catalyst-Data%20Store-006FEE?style=for-the-badge)](https://www.zoho.com/catalyst/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Groq Cloud](https://img.shields.io/badge/Groq-Cloud%20LLM-F34F29?style=for-the-badge)](https://groq.com/)
-[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://huggingface.co/)
-[![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy)](https://numpy.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react)](https://react.dev/)
+[![Python](https://img.shields.io/badge/Python_3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-c8814a.svg?style=flat-square)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/brovk2008/Project-sentinel?style=flat-square&color=c8814a)](https://github.com/brovk2008/Project-sentinel/stargazers)
 
-Project Sentinel is a state-of-the-art **cloud-native crime intelligence platform** designed for law enforcement analysts and investigators. By integrating and correlating millions of criminal, demographic, spatial, financial, and telecom records, it transforms raw administrative data into predictive threat signals in under two seconds.
+Project Sentinel integrates 15+ Karnataka state datasets — 1.67M FIR records, 11M+ financial transactions, and 33K telecom CDRs — into a unified intelligence analysis platform. Analysts can query the corpus in plain English, visualize crime density across 1,074 stations, and surface anomalous financial mule networks. Deployed on Zoho Catalyst; backend queries execute in under 2 seconds.
 
-Deployed on **Zoho Catalyst AppSail** and leveraging a hybrid cloud architecture, Project Sentinel bridges the gap between reactive policing and proactive, data-driven security.
+## [→ Live Platform Demo](https://project-sentinel-60073535541.development.catalystserverless.in/app/index.html)
 
----
-
-## 📸 Platform Interface Preview
-
-> [!NOTE]
-> Below are the core dashboards designed for high-contrast, low-eye-strain command center operation.
-
-| Section | Interface Preview | Description |
-|---|---|---|
-| **Crime Heatmap** | `[ 🗺️ Interactive GIS Heatmap Placeholder ]` | 1km² spatial crime density grid mapping across all Karnataka districts with coordinate fallback rendering. |
-| **Network Analysis** | `[ 🕸️ Fraud & CDR Connection Graph Placeholder ]` | Interactive node-link communication and transactions graph mapping financial and telecom trails. |
-| **Intelligence Assistant** | `[ 🤖 Grounded RAG Terminal Preview ]` | Command-line layout offering database analysis and Cited RAG PDF lookups side-by-side. |
+> **Try the Intelligence Assistant:** Submit queries like *"What are the most common cyber fraud methods in Karnataka?"* or *"Summarize legal penalties for financial fraud under the IPC."*
 
 ---
 
-## ⚡ Key Features
-
-*   **Geospatial Crime Hotspotting**: Renders high-risk coordinates and 1km² density grids utilizing custom spherical spatial clustering algorithms mapped on dynamic Leaflet overlays.
-*   **Predictive Risk Forecasting**: High-accuracy ML model ensembles predicting future monthly incident rates per district, complete with explainable AI (XAI) feature attributions.
-*   **Unsupervised Fraud Scan**: Multi-layered Isolation Forest anomaly detection uncovering complex money laundering rings and money mule networks.
-*   **CDR & Financial Link Analysis**: Visualizes overlapping transaction flows and telecom call detail records (CDR) as unified co-offender networks.
-*   **Hybrid RAG Intelligence Assistant**: Grounded Chat Assistant combining Zoho Catalyst SQL queries and semantic PDF chunk retrieval, powered by Groq (Llama 3.3) and Hugging Face.
+## Contents
+[Platform](#platform) · [Architecture](#architecture) · [RAG Pipeline](#rag-pipeline) · [Datasets](#datasets) · [Models](#models) · [API](#api) · [Setup](#setup) · [Roadmap](FUTURE_ROADMAP.md) · [Team](#team) · [License](#license)
 
 ---
 
-## 🏗️ System Architecture
+## Platform
 
-Project Sentinel's system design is optimized to overcome cloud-container resource constraints (such as running heavy PyTorch or transformer models in serverless instances) by leveraging a hybrid cloud architecture.
+### Crime Density Heatmap & Dark / Light Swapping
+| Dark Theme (Default) | Light Theme (Warm Parchment) |
+|---|---|
+| ![Dark Heatmap](docs/screenshots/heatmap-dark.png) | ![Light Heatmap](docs/screenshots/heatmap-light.png) |
 
-### High-Level System Flow
+*Dynamic crime density grid mapped across 30 Karnataka districts with custom tile swapping corresponding to visual theme changes.*
+
+### Network link and RAG Assistant
+| CDR Call Network | Intelligence Assistant |
+|---|---|
+| ![CDR Network Graph](docs/screenshots/network.png) | ![Grounded RAG Assistant](docs/screenshots/assistant.png) |
+
+*Left: Vis-Network interface displaying telecom calling networks and financial transactions. Right: RAG Terminal with grounded context matching NCRB reports and IPC files.*
+
+---
+
+## Architecture
+
+Project Sentinel's system design is optimized to run inference on serverless containers by utilizing a hybrid cloud model to bridge datastore and external APIs.
 
 ```mermaid
 flowchart TB
     subgraph Frontend [React Single Page Application - Vite]
-        UI[Premium Dark UI]
+        UI[Premium Greyscale & Copper UI]
         Map[Leaflet Geospatial Map]
         Term[RAG Assistant Terminal]
         Graph[Network Link Visualizer]
@@ -84,14 +81,13 @@ flowchart TB
 
 ---
 
-## 🤖 Hybrid RAG & AI Pipeline
+## RAG Pipeline
 
-Rather than relying on resource-intensive local embeddings and heavy vector databases, Project Sentinel splits execution:
-1.  **Vector Embedding Generation**: The query is routed to the Hugging Face Inference API router to get a 384-dimensional dense float vector using `all-MiniLM-L6-v2`.
-2.  **In-Memory Similarity Search**: The FastAPI backend preloads the document chunks embedding matrix from the Catalyst Data Store into memory at startup. Cosine similarity is computed via lightning-fast NumPy dot-products in `< 10ms`.
-3.  **Prompt Completion**: Top chunks are packaged as grounded context and sent to the Groq API running `llama-3.3-70b-versatile` to formulate responses with precise document citations.
+Document chunking splits NCRB report PDFs and crime manuals into 2,384 semantic segments.
 
-### RAG Retrieval Sequence
+1. **Vector Embedding**: The query text is encoded into a 384-dimensional dense vector by routing to the Hugging Face Inference API (`all-MiniLM-L6-v2`).
+2. **NumPy Cosine Similarity**: Embeddings are preloaded into memory at backend startup. Cosine similarity is computed via NumPy dot-products in `< 10ms`.
+3. **Completion & Citation**: High-similarity chunks are injected as context into the Groq API running `llama-3.3-70b-versatile`, producing detailed responses with precise PDF page numbers.
 
 ```mermaid
 sequenceDiagram
@@ -118,116 +114,160 @@ sequenceDiagram
 
 ---
 
-## 📊 Dataset Specifications
+## Datasets
 
-Project Sentinel utilizes **15+ integrated real-world datasets** representing a unified municipal threat landscape.
+The platform runs on **15+ integrated real-world and synthetic datasets** representing a unified municipal threat landscape.
 
-| Dataset | Row Count | Attributes | Purpose |
+| Dataset | Row Count | Source | License | Purpose |
+|---|---|---|---|---|
+| **Karnataka FIR Details** | 1,674,734 | Karnataka Police Open Portal | Government Open Data | Core spatial and historical crime database. |
+| **Financial Transactions** | 11,360,000 | Synthetic Paysim Generator | Public Domain | Wire transfer fraud logs. |
+| **Call Detail Records** | 33,876 | Telecom Simulated Dataset | H2S Datathon | Suspect calls and cell tower handovers. |
+| **Demographics (Census 2011)** | 640 districts | Office of the Registrar General, India | Public Domain | Socio-economic indicators. |
+| **Development Data (SHRUG)** | 154,505 | Development Data Lab | CC BY 4.0 | Consumption index and wealth indicators. |
+| **Crime Manuals & Reports** | 2,384 chunks | National Crime Records Bureau | Public Domain | Grounded RAG Knowledge Base. |
+
+---
+
+## Models
+
+Five machine learning models are deployed in the container environment:
+
+1. **Crime Risk Forecaster (FCT)** — *RandomForest Regressor*
+   - Predicts next-month district crime volumes (**RMSE: 10.514**).
+   - Validated against lag-average baselines, demonstrating a **32% improvement** over naive mean estimators.
+2. **Crime Hotspot Predictor (HOT)** — *XGBoost Classifier*
+   - Predicts station-level crime hotspot probability.
+   - **F1-Score: 0.1715** on a highly-imbalanced multiclass classification task (626 crime classes; baseline random guess: 0.11). Performance is constrained by extreme class sparsity. SMOTE oversampling and focal loss adjustments are planned for subsequent iterations.
+3. **Financial Network Risk (FIN)** — *Isolation Forest*
+   - Unsupervised outlier model scoring account risk based on transaction frequencies, velocities, and geographic anomalies.
+4. **Repeat Crime Pattern Classifier (PAT)** — *K-Means Clustering*
+   - Groups police stations and crime heads into behavioral archetypes. Validated using silhouette scores and elbow analysis.
+5. **Spatiotemporal Anomaly Detector (ANO)** — *Z-Score & IForest Ensemble*
+   - Flags sudden incident spikes in district crime volumes deviating $>2.5\sigma$ from historical trends.
+
+---
+
+## API
+
+| Endpoint | Method | Payload / Query Params | Description |
 |---|---|---|---|
-| **Karnataka FIR Details** | 1,674,734 | District, station, date/time, acts, sections, coordinates, arrests. | Core historical crime database. |
-| **Financial Transactions** | 11,360,000+ | Account IDs, amounts, timestamps, transaction types, anomaly scores. | Wire transfer fraud logs. |
-| **Call Detail Records** | 33,876 | Caller/receiver numbers, call timestamps, durations, cell tower IDs. | Telecom suspect communications logs. |
-| **Demographics (Census 2011)** | 640 districts | Total/urban population, literacy rate, banking density. | Base socio-economic indicators. |
-| **Development Data (SHRUG)** | 154,505 rows | Consumption indexes, relative wealth indicators, nightlight indices. | Regional development factors for ML. |
-| **Crime Manuals & Reports** | 2,384 chunks | Official NCRB reports (2024), cyber fraud guides, law acts. | RAG Knowledge Corpus. |
+| `/api/v1/intelligence/health` | `GET` | None | Connection diagnostics for Catalyst Data Store and Groq. |
+| `/api/v1/intelligence/query` | `POST` | `{ "query": "str" }` | Main hybrid RAG search and cited QA assistant. |
+| `/api/v1/trends/timeseries` | `GET` | `granularity=month/year` | Historical FIR trends and time-series forecasting. |
+| `/api/v1/heatmap/grid` | `GET` | `crime_group`, `year` | Coordinate points and density intensity values for Leaflet overlay. |
+| `/api/v1/network/fraud-graph` | `GET` | `limit=200` | Account nodes and edges indicating fraud laundering volume. |
+| `/api/v1/ai/forecast/all` | `GET` | None | District-level forecasting risks and explainable AI feature weights. |
 
 ---
 
-## 🧠 Model Cards
+## Setup
 
-The platform runs 5 specialized Machine Learning models in production:
-
-1.  **Crime Risk Forecaster (FCT)**: Random Forest Regressor predicting next-month district crime volumes (**RMSE: 10.514**).
-2.  **Crime Hotspot Predictor (HOT)**: XGBoost Classifier predicting station-level hotspot probabilities (**F1-Score: 0.1715**).
-3.  **Financial Network Risk (FIN)**: Unsupervised Isolation Forest scoring bank accounts for money-laundering probability.
-4.  **Repeat Crime Pattern Classifier (PAT)**: K-Means Clustering grouping stations and crime types into behavioral archetypes.
-5.  **Spatiotemporal Anomaly Detector (ANO)**: Unsupervised Isolation Forest + Z-Score alerting on spikes in incident metrics.
-
----
-
-## 🔌 API Endpoints Summary
-
-Below is an overview of the core analytical and AI endpoints exposed by the FastAPI backend:
-
-| Endpoint | Method | Params | Description |
-|---|---|---|---|
-| `/api/v1/intelligence/health` | `GET` | None | Runs health connectivity checks for Catalyst Data Store and Groq API. |
-| `/api/v1/intelligence/query` | `POST` | `{ "query": "str" }` | Main hybrid RAG query assistant processing and cited QA generation. |
-| `/api/v1/intelligence/trends` | `GET` | `district`, `category` | Historical FIR trends and time-series forecasting. |
-| `/api/v1/intelligence/heatmap` | `GET` | `crime_group` | GeoJSON map coordinate points and spatial density values. |
-| `/api/v1/intelligence/network` | `GET` | `account_number` | Graph structure (nodes/edges) for fraud and telecom links. |
-
----
-
-## 🛠️ Installation & Deployment
-
-### Prerequisites
-- Node.js (v18 or higher)
-- Python (v3.9 or higher)
-- Zoho Catalyst CLI (logged in with `catalyst login`)
-
-### Environment Hardening
-
-Copy `.env.example` to `.env` and configure:
-
+### Environment Variables (`.env.example`)
+Configure the following in your local environment file:
 ```ini
-# Database & Backend Config
+# ─── Environment ────────────────────────────────────────────
 ENV=production
 DATABASE_URL=
 
-# AI Cloud Service Credentials
+# ─── AI Cloud Services ──────────────────────────────────────
+# Get from: https://console.groq.com/keys
 GROQ_API_KEY=your-groq-key
+# Get from: https://huggingface.co/settings/tokens (Read Access)
 HF_TOKEN=your-huggingface-read-token
 
-# Zoho Catalyst Settings
+# ─── Zoho Catalyst ──────────────────────────────────────────
 CATALYST_PROJECT_ID=50170000000013047
 CATALYST_ENVIRONMENT=Development
 CATALYST_APP_URL=https://sentinel-backend-50042879481.development.catalystappsail.in
 ```
 
-### Local Development Setup
+### Local Setup
+1. **Backend Service**:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # Windows: .\venv\Scripts\activate
+   pip install -r requirements.txt
+   uvicorn main:app --reload --port 8000
+   ```
+2. **Frontend Service**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   Open `http://localhost:5173/` in your browser.
 
-1.  **Backend Setup**:
-    ```powershell
-    cd backend
-    python -m venv venv
-    .\venv\Scripts\activate
-    pip install -r requirements.txt
-    uvicorn main:app --reload --port 8000
-    ```
+### Microservices
+- `backend/`: Core FastAPI gateway exposing prediction models, vector calculations, and database integrations.
+- `sentinel-test/`: Secondary diagnostic AppSail container running system platform validations, header diagnostics, and environment verification.
 
-2.  **Frontend Setup**:
-    ```powershell
-    cd frontend
-    npm install
-    npm run dev
-    ```
-    Access the interface at `http://localhost:5173`.
+### Cloud Deployment
 
-### Cloud Deployment (Zoho Catalyst)
+Project Sentinel implements a formal three-stage deployment pipeline managed via `.catalystrc` and GitHub Actions:
+- **Development**: Active sandbox environment targeting local development workflows (`env` index `1`).
+- **Staging**: Validates database migrations and external API providers (`env` index `2`).
+- **Production**: Live production application (`env` index `3`).
 
-Build the production assets and deploy the backend to AppSail:
-
-```powershell
+Deploy manually or automatically via the GitHub Actions CI/CD workflow:
+```bash
 # Build frontend
 cd frontend
 npm run build
 cd ..
 
-# Deploy to Catalyst Cloud
-cmd /c "call catalyst deploy < NUL"
+# Set active environment (1 for Dev, 2 for Staging, 3 for Production)
+python scripts/set_active_env.py 2
+
+# Deploy to Catalyst environment
+catalyst deploy --project <PROJECT_NAME_OR_ID> --token <YOUR_CATALYST_TOKEN>
 ```
 
+#### Secrets & Key Rotation Policy
+- **Local Dev**: Configured using a gitignored local `.env` file containing local API keys and configurations.
+- **Staging & Production**: Handled securely via the Zoho Catalyst Console Environment Variable & Secrets configuration manager for AppSail deployments.
+- **Rotation Policy**: Any API key or credential exposed outside of local `.env` or Catalyst secrets (e.g. pasted into public repos, Slack messages, documentation, or AI chats) must be rotated immediately at the provider.
+
+#### Migrations Policy
+To protect runtime integrity and prevent deployment timeouts, **database migrations must never run automatically on code deployment**.
+- All data ingestion and schema setup scripts (such as `scratch/v2_schema_setup.py` or `scripts/import_to_supabase.py`) must be executed as distinct, explicitly-triggered operational events.
+
+#### Cost & Quota Monitoring
+To track API costs:
+- **Google Maps API**: Billing alerts are set up on the Google Cloud Console to trigger warnings at 50%, 75%, and 90% of monthly budgets.
+- **Admin Dashboard**: Surfaces live provider connectivity health check results (`/api/v1/intelligence/health`) and circuit breaker status.
+
+#### Manual Rollback Procedures
+- **Frontend**: Redeploy the previous stable build artifact from local builds or CI release history.
+- **Backend AppSail**: Revert to the previous version container using the Catalyst Web Console.
+- **Database (Data)**: The v1 migration writes exclusively to new v2 graph structures without modifying original v1 tables. A failed migration can be safely rolled back by dropping/truncating v2 tables and restarting the ingestion.
+
 ---
 
-## 🔮 Future Roadmap
+## Roadmap
 
-*   **Real-time Stream Ingestion**: Connect Kafka queues to stream live FIR inputs directly from state dispatch centers.
-*   **Multi-Modal RAG**: Support scanning image and video evidence using vision-language models.
-*   **Distributed Graph Analytics**: Migrate local network visualization to Neo4j AuraDB for multi-hop graph traversing.
+See the detailed [FUTURE_ROADMAP.md](FUTURE_ROADMAP.md) for the consolidated three-stage phase plan, list of out-of-scope tasks, and the human decisions matrix.
+
+**Before Final Datathon Submission**
+- [ ] **SMOTE Oversampling**: Apply to the XGBoost hotspot model to address the 0.1715 F1 multiclass imbalance.
+- [ ] **RAG Citation Drawer**: Add a clickable PDF page display inside the interface sidebars.
+- [ ] **Drilldown Map Coordinates**: Center maps precisely when switching between sub-districts.
+
+**Post-Datathon**
+- [ ] **Live API Integration**: Establish automated webhook listeners with the state police dispatch portal.
+- [ ] **PDF Export**: Generate signed analytical reports for field investigator use.
 
 ---
 
-## 👥 Contributors
+## Team
 
-*   **Project Sentinel Team** — Hackathon Submission (2026).
+| Name | Role | GitHub Profile |
+|---|---|---|
+| **Sentinel Team** | Full-Stack & Machine Learning Engineers | [@brovk2008](https://github.com/brovk2008) |
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

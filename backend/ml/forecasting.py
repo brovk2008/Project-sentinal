@@ -136,8 +136,26 @@ def train_and_evaluate():
     # Evaluate RMSE
     rf_rmse = np.sqrt(mean_squared_error(y_val, rf_pred))
     
+    # Compute naive baseline (Dummy Regressor predicting mean of y_train)
+    from sklearn.dummy import DummyRegressor
+    dummy = DummyRegressor(strategy='mean')
+    dummy.fit(X_train, y_train)
+    dummy_pred = dummy.predict(X_val)
+    baseline_rmse = np.sqrt(mean_squared_error(y_val, dummy_pred))
+    
+    improvement_pct = ((baseline_rmse - rf_rmse) / baseline_rmse) * 100 if baseline_rmse > 0 else 0.0
+    
+    print("\n--- Model Performance vs Naive Baseline ---")
+    print(f"Naive Baseline (Mean) RMSE: {baseline_rmse:.4f}")
+    print(f"RandomForest Forecaster RMSE: {rf_rmse:.4f}")
+    print(f"Improvement: {improvement_pct:.2f}% better than naive baseline\n")
+    
     metrics = {
-        "RandomForest": {"rmse": float(rf_rmse)}
+        "RandomForest": {
+            "rmse": float(rf_rmse),
+            "baseline_rmse": float(baseline_rmse),
+            "improvement_percentage": float(improvement_pct)
+        }
     }
     
     chosen_model_name = "RandomForest"

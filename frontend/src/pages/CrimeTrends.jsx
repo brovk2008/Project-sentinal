@@ -5,10 +5,10 @@ import {
   CartesianGrid
 } from 'recharts'
 import KPICard from '../components/KPICard.jsx'
+import Topbar from '../components/Topbar.jsx'
 import { getApiBaseUrl } from '../config'
 
 const API = `${getApiBaseUrl()}/api/v1/trends`
-const COLORS = ['#38bdf8','#a78bfa','#34d399','#fbbf24','#f87171','#f472b6','#22d3ee','#fb923c','#818cf8','#4ade80']
 
 function fmt(n) {
   if (n == null) return '—'
@@ -20,10 +20,13 @@ function fmt(n) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12 }}>
-      <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>{label}</div>
+    <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 3, padding: '10px 14px', fontSize: 11 }}>
+      <div style={{ fontWeight: 500, marginBottom: 6, color: 'var(--text-primary)', fontFamily: 'JetBrains Mono' }}>{label}</div>
       {payload.map((p, i) => (
-        <div key={i} style={{ color: p.color, marginBottom: 2 }}>{p.name}: <b>{fmt(p.value)}</b></div>
+        <div key={i} style={{ color: p.color || 'var(--text-secondary)', marginBottom: 2, display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+          <span>{p.name}:</span>
+          <span style={{ fontFamily: 'JetBrains Mono', fontWeight: 500 }}>{fmt(p.value)}</span>
+        </div>
       ))}
     </div>
   )
@@ -83,158 +86,258 @@ export default function CrimeTrends() {
   // Shorten long labels for bar chart
   const topCrimesForChart = topCrimes.slice(0, 12).map(c => ({
     ...c,
-    shortHead: c.head.length > 28 ? c.head.slice(0, 28) + '…' : c.head
+    shortHead: c.head.length > 24 ? c.head.slice(0, 24) + '…' : c.head
   }))
 
-  return (
-    <>
-      <div className="page-header">
-        <h2>📈 Crime Trends — Karnataka Police Analytics<span className="badge">REAL DATA</span></h2>
-        <div className="toggle-group" style={{ width: 200 }}>
-          {[['month','Monthly'],['year','Yearly']].map(([v,l]) => (
-            <button key={v} id={`gran-${v}`} className={`toggle-btn ${granularity===v?'active':''}`} onClick={() => setGranularity(v)}>{l}</button>
-          ))}
-        </div>
+  const controls = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 9.5, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', textTransform: 'uppercase' }}>Period</span>
+      <div className="seg">
+        {[['month', 'Monthly'], ['year', 'Yearly']].map(([v, l]) => (
+          <button
+            key={v}
+            id={`gran-${v}`}
+            className={`seg-btn ${granularity === v ? 'active' : ''}`}
+            onClick={() => setGranularity(v)}
+          >
+            {l}
+          </button>
+        ))}
       </div>
+      {loading && <span style={{ fontSize: 10, color: 'var(--accent)' }}>⏳ Loading…</span>}
+    </div>
+  )
 
-      {loading ? (
-        <div className="loading-container"><div className="spinner" /><span>Loading analytics…</span></div>
-      ) : (
-        <div className="page-body">
-          {/* KPIs */}
-          <div className="kpi-grid">
-            <KPICard icon="📋" value={fmt(totalFIRs)} label="Total FIRs" gradient="var(--grad-blue)" change={latestYoy} />
-            <KPICard icon="👥" value={fmt(totalVictims)} label="Total Victims" gradient="var(--grad-red)" />
-            <KPICard icon="⚖️" value={fmt(totalAccused)} label="Accused" gradient="var(--grad-purple)" />
-            <KPICard icon="🔒" value={`${arrestRate}%`} label="Arrest Rate" gradient="var(--grad-green)" />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden' }}>
+      <Topbar
+        title="Crime Trends — Karnataka"
+        meta={`ANALYTICS · ${timeseries.length} DATA POINTS`}
+        controls={controls}
+      />
+
+      <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-base)' }}>
+        {loading ? (
+          <div className="page-loader">
+            <div className="loader-ring" />
           </div>
-
-          {/* Time Series Area Chart */}
-          <div style={{ padding: '0 24px 20px' }}>
-            <div className="panel">
-              <div className="panel-header">
-                <h3>📈 FIR Count Over Time</h3>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{timeseries.length} data points</div>
-              </div>
-              <div className="panel-body">
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={timeseries} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
-                    <defs>
-                      <linearGradient id="tsGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="period" tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
-                      tickFormatter={v => granularity === 'year' ? v : v?.slice(0, 7)} interval="preserveStartEnd" />
-                    <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickFormatter={fmt} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="count" name="FIRs" stroke="#38bdf8" fill="url(#tsGrad)" strokeWidth={2} dot={false} />
-                    <Area type="monotone" dataKey="arrested" name="Arrested" stroke="#34d399" fill="none" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {/* KPIs */}
+            <div className="kpi-grid">
+              <KPICard
+                value={fmt(totalFIRs)}
+                label="Total FIRs"
+                sub="Cumulative case records"
+                change={latestYoy}
+              />
+              <KPICard
+                value={fmt(totalVictims)}
+                label="Total Victims"
+                sub="Injured or affected persons"
+              />
+              <KPICard
+                value={fmt(totalAccused)}
+                label="Accused Profiles"
+                sub="Named in FIR records"
+              />
+              <KPICard
+                value={`${arrestRate}%`}
+                label="Arrest Rate"
+                sub="Accused apprehended ratio"
+              />
             </div>
-          </div>
 
-          {/* Row: Top crimes + By group pie */}
-          <div style={{ padding: '0 24px 20px', display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-            {/* Top Crimes Bar */}
-            <div className="panel">
-              <div className="panel-header">
-                <h3>🏆 Top Crime Types</h3>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ranked by FIR count</div>
+            {/* Time Series Area Chart */}
+            <div style={{ background: 'var(--bg-panel)', padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.05em' }}>FIR Count Over Time</h3>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginTop: 2 }}>TIMESERIES DATA TRENDS</div>
+                </div>
               </div>
-              <div className="panel-body">
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={topCrimesForChart} layout="vertical" margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickFormatter={fmt} />
-                    <YAxis type="category" dataKey="shortHead" width={180} tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" name="FIRs" radius={[0, 4, 4, 0]}>
-                      {topCrimesForChart.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={timeseries} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+                  <defs>
+                    <linearGradient id="tsGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={v => granularity === 'year' ? v : v?.slice(0, 7)}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={fmt}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border-mid)', strokeWidth: 1 }} />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    name="FIRs"
+                    stroke="var(--accent)"
+                    fill="url(#tsGrad)"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="arrested"
+                    name="Arrested"
+                    stroke="var(--text-muted)"
+                    fill="none"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Row: Top crimes + By group pie */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 1, background: 'var(--border)', borderBottom: '1px solid var(--border)' }}>
+              {/* Top Crimes Bar */}
+              <div style={{ background: 'var(--bg-panel)', padding: '20px 24px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Top Crime Types</h3>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginTop: 2 }}>RANKED BY TOTAL CASE COUNT</div>
+                </div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={topCrimesForChart} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={fmt} />
+                    <YAxis type="category" dataKey="shortHead" width={140} tickLine={false} axisLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 9 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-hover)', opacity: 0.3 }} />
+                    <Bar dataKey="count" name="FIRs" radius={[0, 2, 2, 0]}>
+                      {topCrimesForChart.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={i === 0 ? 'var(--accent)' : 'var(--text-muted)'}
+                          opacity={i === 0 ? 0.9 : 0.4 - (i * 0.025)}
+                        />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
 
-            {/* Crime Group Pie */}
-            <div className="panel">
-              <div className="panel-header"><h3>🥧 Crime Categories</h3></div>
-              <div className="panel-body">
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={byGroup} dataKey="count" nameKey="group" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
-                      {byGroup.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ maxHeight: 80, overflowY: 'auto', marginTop: 8 }}>
+              {/* Crime Group Pie */}
+              <div style={{ background: 'var(--bg-panel)', padding: '20px 24px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Crime Categories</h3>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginTop: 2 }}>DISTRIBUTION OF MAJORS</div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 140 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={byGroup}
+                        dataKey="count"
+                        nameKey="group"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={35}
+                        outerRadius={55}
+                        paddingAngle={2}
+                      >
+                        {byGroup.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={i === 0 ? 'var(--accent)' : 'var(--text-secondary)'}
+                            opacity={i === 0 ? 0.9 : 0.6 - (i * 0.05)}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1, marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                   {byGroup.map((g, i) => (
-                    <div key={g.group} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, fontSize: 11 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length], flexShrink: 0 }} />
+                    <div key={g.group} style={{ display: 'flex', alignItems: 'center', justifyBehavior: 'space-between', gap: 8, marginBottom: 6, fontSize: 10 }}>
+                      <div style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: i === 0 ? 'var(--accent)' : 'var(--text-secondary)',
+                        opacity: i === 0 ? 0.9 : 0.6 - (i * 0.05),
+                        flexShrink: 0
+                      }} />
                       <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{g.group}</span>
-                      <span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono', fontWeight: 600 }}>{fmt(g.count)}</span>
+                      <span style={{ color: 'var(--text-primary)', fontFamily: 'JetBrains Mono', fontWeight: 500 }}>{fmt(g.count)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Row: Day of Week Radar + Conviction Funnel */}
-          <div style={{ padding: '0 24px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* Day of Week Radar */}
-            <div className="panel">
-              <div className="panel-header"><h3>📅 Crime by Day of Week</h3></div>
-              <div className="panel-body">
-                <ResponsiveContainer width="100%" height={220}>
+            {/* Row: Day of Week Radar + Conviction Funnel */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--border)' }}>
+              {/* Day of Week Radar */}
+              <div style={{ background: 'var(--bg-panel)', padding: '20px 24px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Crime by Day of Week</h3>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginTop: 2 }}>WEEKDAY INTENSITY DISTRIBUTION</div>
+                </div>
+                <ResponsiveContainer width="100%" height={180}>
                   <RadarChart data={dow} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
                     <PolarGrid stroke="var(--border)" />
-                    <PolarAngleAxis dataKey="day_name" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
-                    <Radar name="FIRs" dataKey="count" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.25} strokeWidth={2} />
-                    <Tooltip formatter={fmt} contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+                    <PolarAngleAxis dataKey="day_name" tick={{ fill: 'var(--text-secondary)', fontSize: 9 }} />
+                    <Radar name="FIRs" dataKey="count" stroke="var(--text-secondary)" fill="var(--text-secondary)" fillOpacity={0.08} strokeWidth={1} />
+                    <Tooltip content={<CustomTooltip />} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
 
-            {/* YoY + Funnel */}
-            <div className="panel">
-              <div className="panel-header"><h3>⚖️ Justice Pipeline</h3><span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Accused → Arrested → Convicted</span></div>
-              <div className="panel-body">
-                {funnel.map((stage, i) => {
-                  const colors = ['#38bdf8', '#34d399', '#a78bfa']
-                  return (
-                    <div key={stage.stage} style={{ marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{stage.stage}</span>
-                        <span style={{ fontSize: 12, fontFamily: 'JetBrains Mono', color: colors[i] }}>
+              {/* YoY + Funnel */}
+              <div style={{ background: 'var(--bg-panel)', padding: '20px 24px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Justice Pipeline</h3>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginTop: 2 }}>CASE PROGRESSION EFFICIENCY</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {funnel.map((stage, i) => (
+                    <div key={stage.stage}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--text-primary)' }}>{stage.stage}</span>
+                        <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono', color: i === 0 ? 'var(--accent)' : 'var(--text-secondary)' }}>
                           {fmt(stage.value)} ({stage.pct.toFixed(1)}%)
                         </span>
                       </div>
-                      <div className="risk-bar-wrap">
-                        <div className="risk-bar-fill" style={{ width: `${stage.pct}%`, background: colors[i] }} />
+                      <div style={{ height: 2, background: 'var(--border)', position: 'relative' }}>
+                        <div style={{
+                          height: 2,
+                          background: i === 0 ? 'var(--accent)' : 'var(--text-muted)',
+                          width: `${stage.pct}%`
+                        }} />
                       </div>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
 
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Year-over-Year Growth</div>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 16 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono', color: 'var(--text-ghost)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Year-over-Year Growth</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {yoy.map(y => (
                       <div key={y.year} style={{
-                        padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        background: y.growth_pct > 0 ? 'rgba(248,113,113,0.15)' : y.growth_pct < 0 ? 'rgba(52,211,153,0.15)' : 'var(--bg-elevated)',
-                        color: y.growth_pct > 0 ? 'var(--accent-red)' : y.growth_pct < 0 ? 'var(--accent-green)' : 'var(--text-muted)',
-                        border: '1px solid var(--border)'
+                        padding: '3px 6px',
+                        borderRadius: 2,
+                        fontSize: 9.5,
+                        fontFamily: 'JetBrains Mono',
+                        background: 'var(--bg-elevated)',
+                        color: y.growth_pct > 0 ? 'var(--accent)' : 'var(--text-muted)',
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        gap: 4
                       }}>
-                        {y.year}: {y.growth_pct > 0 ? '+' : ''}{y.growth_pct.toFixed(1)}%
+                        <span>{y.year}:</span>
+                        <span>{y.growth_pct > 0 ? '+' : ''}{y.growth_pct.toFixed(1)}%</span>
                       </div>
                     ))}
                   </div>
@@ -242,8 +345,9 @@ export default function CrimeTrends() {
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   )
 }
+

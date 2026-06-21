@@ -1,0 +1,40 @@
+PROJECT SENTINEL — DEMO DAY READY CHECKLIST
+===========================================
+
+[ ] PHYSICAL & SYSTEM STATE
+    - Power cable connected (never demo on battery).
+    - Windows Sleep settings: Screen turn-off and sleep set to 'Never'.
+    - Network: Local Wi-Fi stable OR Cellular Hotspot active as a backup.
+    - Sound & Notifications: 'Do Not Disturb' mode activated on Windows.
+    - Browser: All unrelated tabs, folders, and personal windows closed.
+
+[ ] INFRASTRUCTURE BOOT SEQUENCE
+    - Run START_DEMO.bat as Administrator.
+    - Confirm Docker Desktop launches and "sentinel_postgres" container starts (Up).
+    - Confirm Ollama Server processes start.
+    - Confirm Python FastAPI starts in new minimized window.
+    - Confirm Cloudflare Tunnel establishes and public URL copies to clipboard.
+
+[ ] AI & RAG PRE-WARMUP VERIFICATION
+    - Open backend startup logs and verify the following output lines:
+      * "Warm Cache: Network statistics cache warmed."
+      * "Warm Cache [DEMO MODE]: RAG SentenceTransformer model preheated successfully."
+      * "[LLM] Warmup started"
+      * "[LLM] Warmup complete"
+    - Execute VERIFY_DEMO.bat and ensure output reads "STATUS: SUCCESS".
+
+[ ] FRONTEND CONFIGURATION
+    - Set Vite config or environment parameters to the copied Cloudflare URL.
+    - Open the frontend client at http://localhost:5173 or using the public tunnel.
+    - Perform a manual "Hard Refresh" (Ctrl + F5) to clear cache and reload files.
+
+[ ] FLOW REHEARSAL & BACKUPS
+    - Verify page routes load correctly:
+      * Crime Trends (Dashboard)
+      * AI Forecasting (RandomForest + explainability sidebar)
+      * AI Hotspots (XGBoost centoid Leaflet map)
+      * AI Anomalies (Isolation Forest card feed)
+      * Network Analysis (vis-network loop finder)
+      * Intelligence Assistant (pgvector semantic search + RAG prompt + Evidence Inspector)
+    - Open screenshot backup directory (check filenames matching SCREENSHOT_CHECKLIST.md).
+    - Keep DEMO_RECOVERY_CARDS.md open in text editor for instant troubleshooting.

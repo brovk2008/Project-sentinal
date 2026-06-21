@@ -1,0 +1,65 @@
+{
+  "defaults": {
+    "project": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "50170000000013047",
+      "name": "Project-Sentinel",
+      "domain": {
+        "id": "50042879481",
+        "name": "project-sentinel-60073535541.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60073535541",
+          "name": "Development",
+          "type": 3,
+          "env_status": "Active",
+          "project_details": {
+            "project_name": "Project-Sentinel",
+            "id": "50170000000013047",
+            "project_type": "Live"
+          },
+          "is_default": false,
+          "action_required": false
+        },
+        {
+          "idx": 2,
+          "id": "60073535542",
+          "name": "Staging",
+          "type": 2,
+          "env_status": "Active",
+          "project_details": {
+            "project_name": "Project-Sentinel",
+            "id": "50170000000013047",
+            "project_type": "Live"
+          },
+          "is_default": false,
+          "action_required": false
+        },
+        {
+          "idx": 3,
+          "id": "60073535543",
+          "name": "Production",
+          "type": 1,
+          "env_status": "Active",
+          "project_details": {
+            "project_name": "Project-Sentinel",
+            "id": "50170000000013047",
+            "project_type": "Live"
+          },
+          "is_default": false,
+          "action_required": false
+        }
+      ]
+    }
+  ]
+}

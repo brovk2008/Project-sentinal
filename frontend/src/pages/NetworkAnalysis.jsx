@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Network } from 'vis-network/standalone'
 import { getApiBaseUrl } from '../config'
+import Topbar from '../components/Topbar.jsx'
+import KPICard from '../components/KPICard.jsx'
 
 const API = `${getApiBaseUrl()}/api/v1/network`
 
@@ -12,19 +14,22 @@ function fmt(n) {
   return n.toLocaleString()
 }
 
-// Risk score → color gradient green→yellow→red
+// Restrained risk color palette (greyscale with copper for high-risk)
 function riskColor(score) {
-  if (score >= 0.8) return '#ef4444'
-  if (score >= 0.6) return '#f97316'
-  if (score >= 0.4) return '#fbbf24'
-  if (score >= 0.2) return '#34d399'
-  return '#38bdf8'
+  if (score >= 0.8) return 'var(--accent)' // Copper highlight for high risk
+  if (score >= 0.6) return 'var(--text-secondary)'
+  if (score >= 0.4) return 'var(--text-muted)'
+  if (score >= 0.2) return 'var(--text-dim)'
+  return 'var(--text-ghost)'
 }
 
-// Telecom company color palette
+// Telecom company colors mapping
 const COMPANY_COLORS = {
-  'Jio': '#38bdf8', 'Airtel': '#f87171', 'Vi': '#a78bfa',
-  'BSNL': '#34d399', 'default': '#94a3b8'
+  'Jio': 'var(--accent)', // Copper highlight
+  'Airtel': 'var(--text-secondary)',
+  'Vi': 'var(--text-muted)',
+  'BSNL': 'var(--text-dim)',
+  'default': 'var(--text-ghost)'
 }
 
 export default function NetworkAnalysis() {
@@ -40,6 +45,15 @@ export default function NetworkAnalysis() {
   const [limit, setLimit] = useState(200)
   const [nodeCount, setNodeCount] = useState(0)
   const [edgeCount, setEdgeCount] = useState(0)
+  const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark')
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setTheme(e.detail)
+    }
+    window.addEventListener('themechange', handleThemeChange)
+    return () => window.removeEventListener('themechange', handleThemeChange)
+  }, [])
 
   // Load KPI stats
   useEffect(() => {
@@ -49,63 +63,77 @@ export default function NetworkAnalysis() {
       .catch(() => {})
   }, [])
 
-  // Build vis-network options
-  const buildOptions = () => ({
-    nodes: {
-      shape: 'dot',
-      scaling: { min: 8, max: 28 },
-      font: { color: '#94a3b8', size: 10, face: 'Inter' },
-      borderWidth: 2,
-      borderWidthSelected: 3,
-      shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 8 }
-    },
-    edges: {
-      arrows: { to: { enabled: true, scaleFactor: 0.5 } },
-      color: { color: '#1e3a5f', highlight: '#38bdf8', hover: '#38bdf8' },
-      smooth: { type: 'dynamic' },
-      scaling: { min: 1, max: 5 },
-      shadow: false
-    },
-    physics: {
-      stabilization: { iterations: 150 },
-      barnesHut: { gravitationalConstant: -8000, springLength: 120 }
-    },
-    interaction: {
-      hover: true,
-      tooltipDelay: 200,
-      hideEdgesOnDrag: true,
-      navigationButtons: false,
-      keyboard: false
-    },
-    layout: { randomSeed: 42 }
-  })
+  // Build vis-network options responsive to theme variables
+  const buildOptions = useCallback(() => {
+    const isDark = theme === 'dark'
+    const borderCol = isDark ? '#191a1f' : '#e2ddd8'
+    const textCol = isDark ? '#efefef' : '#111110'
+    const edgeCol = isDark ? '#1c1c22' : '#d8d3cd'
+
+    return {
+      nodes: {
+        shape: 'dot',
+        scaling: { min: 8, max: 24 },
+        font: { color: textCol, size: 9, face: 'Inter' },
+        borderWidth: 1.5,
+        borderWidthSelected: 2.5,
+        shadow: false
+      },
+      edges: {
+        arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+        color: { color: edgeCol, highlight: 'var(--accent)', hover: 'var(--accent)' },
+        smooth: { type: 'dynamic' },
+        scaling: { min: 1, max: 4 },
+        shadow: false
+      },
+      physics: {
+        stabilization: { iterations: 120 },
+        barnesHut: { gravitationalConstant: -6000, springLength: 100 }
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 150,
+        hideEdgesOnDrag: true,
+        navigationButtons: false,
+        keyboard: false
+      },
+      layout: { randomSeed: 42 }
+    }
+  }, [theme])
 
   const renderGraph = useCallback((nodes, edges, mode) => {
     if (!graphRef.current) return
     if (netInst.current) { netInst.current.destroy() }
 
-    const visNodes = nodes.map(n => ({
-      id: n.id,
-      label: mode === 'fraud'
-        ? (n.owner && n.owner !== 'Unknown' ? n.owner.split(' ')[0] : n.id.slice(-6))
-        : n.id.slice(-8),
-      title: mode === 'fraud'
-        ? `<div style="background:#0d1422;border:1px solid #1e2d45;border-radius:8px;padding:10px;color:#94a3b8;font-size:12px;">
-            <b style="color:#f0f6ff">${n.owner || n.id}</b><br/>
-            Bank: ${n.bank || '—'}<br/>
-            Risk: <span style="color:${riskColor(n.risk_score)}">${(n.risk_score || 0).toFixed(2)}</span>
-           </div>`
-        : `<div style="background:#0d1422;border:1px solid #1e2d45;border-radius:8px;padding:8px;color:#94a3b8;font-size:12px;">
-            <b style="color:#f0f6ff">${n.id}</b><br/>Company: ${n.company || '—'}
-           </div>`,
-      size: 6 + Math.min((n.val || 1) * 4, 22),
-      color: {
-        background: mode === 'fraud' ? riskColor(n.risk_score || 0) : (COMPANY_COLORS[n.company] || COMPANY_COLORS.default),
-        border: mode === 'fraud' ? riskColor(n.risk_score || 0) : (COMPANY_COLORS[n.company] || COMPANY_COLORS.default),
-        highlight: { background: '#ffffff', border: '#38bdf8' }
-      },
-      font: { color: '#e2e8f0' }
-    }))
+    const isDark = theme === 'dark'
+    const bgCol = isDark ? '#0f1011' : '#faf9f7'
+    const borderCol = isDark ? '#1c1c22' : '#d8d3cd'
+    const textCol = isDark ? '#efefef' : '#111110'
+
+    const visNodes = nodes.map(n => {
+      const col = mode === 'fraud' ? riskColor(n.risk_score || 0) : (COMPANY_COLORS[n.company] || COMPANY_COLORS.default)
+      return {
+        id: n.id,
+        label: mode === 'fraud'
+          ? (n.owner && n.owner !== 'Unknown' ? n.owner.split(' ')[0] : n.id.slice(-6))
+          : n.id.slice(-8),
+        title: mode === 'fraud'
+          ? `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:3px;padding:8px 10px;color:${textCol};font-size:10.5px;font-family:Inter;">
+              <b style="color:var(--accent)">${n.owner || n.id}</b><br/>
+              Bank: ${n.bank || '—'}<br/>
+              Risk: <span style="font-family:JetBrains Mono;font-weight:500;">${(n.risk_score || 0).toFixed(2)}</span>
+             </div>`
+          : `<div style="background:${bgCol};border:1px solid ${borderCol};border-radius:3px;padding:6px 8px;color:${textCol};font-size:10.5px;font-family:Inter;">
+              <b style="color:var(--accent)">${n.id}</b><br/>Company: ${n.company || '—'}
+             </div>`,
+        size: 7 + Math.min((n.val || 1) * 3, 20),
+        color: {
+          background: col,
+          border: col,
+          highlight: { background: 'var(--bg-elevated)', border: 'var(--accent)' }
+        }
+      }
+    })
 
     const visEdges = edges.map((e, i) => ({
       id: i,
@@ -114,8 +142,7 @@ export default function NetworkAnalysis() {
       label: e.label,
       title: e.title,
       value: e.value || 1,
-      color: e.color || undefined,
-      font: { color: '#475569', size: 9, strokeWidth: 0, align: 'middle' }
+      font: { color: 'var(--text-muted)', size: 8, strokeWidth: 0, align: 'middle', face: 'JetBrains Mono' }
     }))
 
     const net = new Network(
@@ -137,7 +164,7 @@ export default function NetworkAnalysis() {
     netInst.current = net
     setNodeCount(nodes.length)
     setEdgeCount(edges.length)
-  }, [])
+  }, [theme, buildOptions])
 
   useEffect(() => {
     let active = true
@@ -179,164 +206,203 @@ export default function NetworkAnalysis() {
       .catch(() => setGraphLoading(false))
   }
 
-  return (
-    <>
-      <div className="page-header">
-        <h2>🕸️ Network Analysis — Fraud & Communication<span className="badge">REAL DATA</span></h2>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>vis-network · Max 300 nodes / 1000 edges</div>
+  const controls = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ fontSize: 9.5, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', textTransform: 'uppercase' }}>Network View</span>
+      <div className="seg">
+        {[['fraud', 'Fraud Volume'], ['cdr', 'Telecom CDR']].map(([v, l]) => (
+          <button
+            key={v}
+            className={`seg-btn ${graphMode === v ? 'active' : ''}`}
+            onClick={() => setGraphMode(v)}
+          >
+            {l}
+          </button>
+        ))}
       </div>
+      {graphLoading && <span style={{ fontSize: 10, color: 'var(--accent)' }}>⏳ Rendering…</span>}
+    </div>
+  )
 
-      {/* Stats KPIs */}
-      {stats && (
-        <div style={{ display: 'flex', gap: 12, padding: '16px 24px 0', flexWrap: 'wrap' }}>
-          {[
-            { icon: '💰', value: fmt(stats.total_fraud_amount), label: 'Total Fraud Volume', color: 'var(--accent-red)' },
-            { icon: '🚨', value: fmt(stats.total_fraud_transactions), label: 'Fraud Transactions', color: 'var(--accent-amber)' },
-            { icon: '⚠️', value: fmt(stats.high_risk_accounts), label: 'High-Risk Accounts', color: 'var(--accent-purple)' },
-            { icon: '📞', value: fmt(stats.total_cdr_records), label: 'CDR Records', color: 'var(--accent-cyan)' },
-            { icon: '📱', value: fmt(stats.unique_callers), label: 'Unique Numbers', color: 'var(--accent-blue)' },
-          ].map(s => (
-            <div key={s.label} style={{ flex: 1, minWidth: 150, padding: '12px 14px', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'JetBrains Mono', color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 2 }}>{s.label}</div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden' }}>
+      <Topbar
+        title="Network Analysis — Connections"
+        meta={`GRAPH · ${nodeCount} NODES · ${edgeCount} EDGES`}
+        controls={controls}
+      />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* KPI Row */}
+        {stats && (
+          <div className="kpi-grid">
+            <KPICard
+              value={fmt(stats.total_fraud_amount)}
+              label="Fraud Volume"
+              sub="Sum of tagged transactions"
+            />
+            <KPICard
+              value={fmt(stats.total_fraud_transactions)}
+              label="Fraud Events"
+              sub="Individual fraud FIR accounts"
+            />
+            <KPICard
+              value={fmt(stats.high_risk_accounts)}
+              label="High Risk Nodes"
+              sub="Accounts above 0.8 threshold"
+            />
+            <KPICard
+              value={fmt(stats.total_cdr_records)}
+              label="Telecom CDRs"
+              sub="Call detail data rows"
+            />
+          </div>
+        )}
+
+        <div className="content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* Left panel options */}
+          <div className="data-panel" style={{ width: 200, minWidth: 200 }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div className="label-xs" style={{ marginBottom: 6 }}>Max Edge Limit</div>
+              <select
+                className="tb-select"
+                style={{ width: '100%' }}
+                value={limit}
+                onChange={e => setLimit(Number(e.target.value))}
+              >
+                {[50, 100, 200, 500].map(v => <option key={v} value={v}>{v} links</option>)}
+              </select>
             </div>
-          ))}
-        </div>
-      )}
 
-      <div className="network-main" style={{ flex: 1, display: 'flex', overflow: 'hidden', marginTop: 16 }}>
-        {/* Controls Panel */}
-        <div className="network-controls">
-          <div className="control-group">
-            <div className="control-group-label">Graph Mode</div>
-            {[['fraud','💰 Fraud Network'],['cdr','📞 CDR Call Network']].map(([v,l]) => (
-              <label key={v} className="radio-item">
-                <input type="radio" name="graphMode" value={v} checked={graphMode===v} onChange={() => setGraphMode(v)} />
-                {l}
-              </label>
-            ))}
-          </div>
+            {graphMode === 'fraud' && (
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                <div className="label-xs" style={{ marginBottom: 6 }}>Trace Co-offender</div>
+                <input
+                  type="text"
+                  className="tb-select"
+                  style={{ width: '100%', padding: '6px 8px', textTransform: 'none' }}
+                  placeholder="Enter Account ID..."
+                  value={traceAccount}
+                  onChange={e => setTraceAccount(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleTrace()}
+                />
+                <button
+                  className="term-send"
+                  style={{ width: '100%', marginTop: 6, justifyContent: 'center', fontSize: 10, padding: '5px' }}
+                  onClick={handleTrace}
+                >
+                  Trace Path (3 Hops)
+                </button>
+                {traceResult && (
+                  <div style={{ fontSize: 8.5, fontFamily: 'JetBrains Mono', color: 'var(--accent)', marginTop: 6 }}>
+                    Traced: {traceResult.nodes} nodes / {traceResult.edges} links
+                  </div>
+                )}
+              </div>
+            )}
 
-          <div className="control-group">
-            <div className="control-group-label">Max Edges</div>
-            <select id="limit-select" className="filter-select" value={limit} onChange={e => setLimit(Number(e.target.value))}>
-              {[50, 100, 200, 500].map(v => <option key={v} value={v}>{v} edges</option>)}
-            </select>
-          </div>
-
-          {graphMode === 'fraud' && (
-            <div className="control-group">
-              <div className="control-group-label">Trace Fraud Chain</div>
-              <input id="trace-account-input" className="filter-input" style={{ minWidth: 0 }}
-                placeholder="Account ID…"
-                value={traceAccount}
-                onChange={e => setTraceAccount(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleTrace()}
-              />
-              <button id="trace-btn" className="filter-btn" style={{ marginTop: 4 }} onClick={handleTrace}>
-                🔍 Trace (3 hops)
-              </button>
-              {traceResult && (
-                <div style={{ fontSize: 11, color: 'var(--accent-green)', marginTop: 4 }}>
-                  Traced: {traceResult.nodes} nodes · {traceResult.edges} edges
+            {/* Legend section */}
+            <div style={{ padding: '12px 14px', marginTop: 'auto', borderTop: '1px solid var(--border)' }}>
+              <div className="label-xs" style={{ marginBottom: 8 }}>{graphMode === 'fraud' ? 'Risk Scale' : 'Carrier Legend'}</div>
+              {graphMode === 'fraud' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[['var(--accent)', 'Critical (>= 0.8)'], ['var(--text-secondary)', 'Elevated (>= 0.6)'], ['var(--text-muted)', 'Moderate (>= 0.4)'], ['var(--text-ghost)', 'Nominal (< 0.2)']].map(([c, l]) => (
+                    <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5, color: 'var(--text-secondary)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                      <span>{l}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[['var(--accent)', 'Jio Network'], ['var(--text-secondary)', 'Airtel Network'], ['var(--text-muted)', 'Vi Network'], ['var(--text-dim)', 'BSNL Network']].map(([c, l]) => (
+                    <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5, color: 'var(--text-secondary)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                      <span>{l}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )}
-
-          <div className="control-group">
-            <div className="control-group-label">Graph Info</div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-              <div>Nodes: <span className="mono" style={{ color: 'var(--accent-blue)' }}>{nodeCount}</span></div>
-              <div>Edges: <span className="mono" style={{ color: 'var(--accent-blue)' }}>{edgeCount}</span></div>
-            </div>
           </div>
 
-          {graphMode === 'fraud' && (
-            <div className="control-group">
-              <div className="control-group-label">Risk Legend</div>
-              {[['#ef4444','High (>0.8)'],['#f97316','Med-High (0.6)'],['#fbbf24','Medium (0.4)'],['#34d399','Low (0.2)'],['#38bdf8','Minimal']].map(([c,l]) => (
-                <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-secondary)' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: c, flexShrink: 0 }} />{l}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Graph Canvas */}
-        <div className="network-graph">
-          {graphLoading && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: 'rgba(8,12,20,0.6)' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div className="spinner" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Building graph…</div>
+          {/* Canvas area */}
+          <div style={{ flex: 1, position: 'relative', background: 'var(--map-bg)' }}>
+            {graphLoading && (
+              <div className="page-loader" style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'var(--accent-sub)' }}>
+                <div className="loader-ring" />
               </div>
-            </div>
-          )}
-          <div ref={graphRef} className="graph-canvas" />
-        </div>
-
-        {/* Node Detail Panel */}
-        <div className="network-details">
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: 12 }}>
-            Node Details
+            )}
+            <div ref={graphRef} style={{ width: '100%', height: '100%' }} />
           </div>
-          {!selectedNode && (
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Click any node in the graph to see its details here.
+
+          {/* Node detail side panel */}
+          <div className="ai-sidebar" style={{ width: 220, minWidth: 220 }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+              <div className="label-xs">Entity Properties</div>
             </div>
-          )}
-          {selectedNode && graphMode === 'fraud' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{selectedNode.owner || selectedNode.id}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>{selectedNode.id}</div>
-              </div>
-              {[
-                { label: 'Bank', value: selectedNode.bank || '—' },
-                { label: 'Risk Score', value: (selectedNode.risk_score || 0).toFixed(2), color: riskColor(selectedNode.risk_score || 0) },
-                { label: 'Network Degree', value: selectedNode.val },
-              ].map(item => (
-                <div key={item.label} style={{ padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'JetBrains Mono', color: item.color || 'var(--text-primary)' }}>{item.value}</div>
+            <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {selectedNode ? (
+                graphMode === 'fraud' ? (
+                  <>
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>{selectedNode.owner || 'Unnamed Account'}</div>
+                      <div style={{ fontSize: 8.5, fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>{selectedNode.id}</div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                      <div className="label-xs" style={{ fontSize: 8, marginBottom: 4 }}>Risk Level</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'JetBrains Mono', color: selectedNode.risk_score >= 0.8 ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                        {(selectedNode.risk_score || 0).toFixed(4)}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                      <div className="label-xs" style={{ fontSize: 8, marginBottom: 4 }}>Institution</div>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)' }}>{selectedNode.bank || 'Unknown Bank'}</div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                      <div className="label-xs" style={{ fontSize: 8, marginBottom: 4 }}>Connections (Degree)</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'JetBrains Mono', color: 'var(--text-primary)' }}>{selectedNode.val || 0}</div>
+                    </div>
+
+                    <button
+                      className="term-send"
+                      style={{ width: '100%', justifyContent: 'center', padding: '6px', fontSize: 10, marginTop: 4 }}
+                      onClick={() => { setTraceAccount(selectedNode.id); setTimeout(handleTrace, 0) }}
+                    >
+                      Focus / Trace Node
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Phone Contact</div>
+                      <div style={{ fontSize: 9, fontFamily: 'JetBrains Mono', color: 'var(--text-muted)' }}>{selectedNode.id}</div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                      <div className="label-xs" style={{ fontSize: 8, marginBottom: 4 }}>Mobile Operator</div>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--accent)' }}>{selectedNode.company || 'Unknown Network'}</div>
+                    </div>
+
+                    <div style={{ padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                      <div className="label-xs" style={{ fontSize: 8, marginBottom: 4 }}>Connection Count</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, fontFamily: 'JetBrains Mono', color: 'var(--text-primary)' }}>{selectedNode.val || 0}</div>
+                    </div>
+                  </>
+                )
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 40 }}>
+                  <i className="ti ti-vector-triangle" style={{ fontSize: 18, color: 'var(--text-ghost)', display: 'block', marginBottom: 8 }} />
+                  Select node to view network properties
                 </div>
-              ))}
-              <div style={{ marginTop: 4 }}>
-                <div style={{ marginBottom: 6, fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Risk Bar</div>
-                <div className="risk-bar-wrap">
-                  <div className="risk-bar-fill" style={{
-                    width: `${(selectedNode.risk_score || 0) * 100}%`,
-                    background: riskColor(selectedNode.risk_score || 0)
-                  }} />
-                </div>
-              </div>
-              <button
-                id="trace-selected-btn"
-                className="filter-btn"
-                style={{ width: '100%', marginTop: 8 }}
-                onClick={() => { setTraceAccount(selectedNode.id); setTimeout(handleTrace, 0) }}
-              >
-                🔍 Trace This Account
-              </button>
+              )}
             </div>
-          )}
-          {selectedNode && graphMode === 'cdr' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{selectedNode.id}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Telecom: {selectedNode.company || '—'}</div>
-              </div>
-              <div style={{ padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 4 }}>Network Connections</div>
-                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'JetBrains Mono', color: 'var(--accent-blue)' }}>{selectedNode.val}</div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

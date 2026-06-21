@@ -101,14 +101,20 @@ def analyze_account_network(account_number, max_nodes=300, max_edges=1000):
     accounts_list = list(accounts)[:max_nodes]
     
     # Step 2: Fetch all transactions between these 1-hop accounts (2-hop network)
-    accounts_str = ", ".join([f"'{a}'" for a in accounts_list])
+    param_dict = {}
+    placeholders_list = []
+    for idx, val in enumerate(accounts_list):
+        param_key = f"acc{idx}"
+        placeholders_list.append(f":{param_key}")
+        param_dict[param_key] = val
+    accounts_str = ", ".join(placeholders_list)
     query2 = f"""
         SELECT sender_account, receiver_account, amount, is_fraud, velocity_score, geo_anomaly_score, timestamp
         FROM fact_financial_transactions
         WHERE sender_account IN ({accounts_str})
           AND receiver_account IN ({accounts_str});
     """
-    rows = db_client.execute(query2).fetchall()
+    rows = db_client.execute(query2, param_dict).fetchall()
     
     # Build NetworkX graph
     G = nx.DiGraph()

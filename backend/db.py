@@ -70,6 +70,54 @@ class CatalystDBClient:
                 import traceback
                 self.init_error = traceback.format_exc()
                 print(f"[Catalyst DB Client] Failed to initialize zcatalyst-sdk on startup: {e}.")
+        else:
+            try:
+                self.run_local_migrations()
+            except Exception as e:
+                print(f"[Catalyst DB Client] Failed to run local migrations: {e}.")
+
+    def run_local_migrations(self):
+        conn = sqlite3.connect(self.sqlite_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("PRAGMA table_info(relationships)")
+            columns = [c[1] for c in cursor.fetchall()]
+            if "version_history" not in columns:
+                cursor.execute("ALTER TABLE relationships ADD COLUMN version_history TEXT;")
+                print("[Catalyst DB Client] Migrated: added version_history to relationships table.")
+            
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS entity_resolutions (
+                id TEXT PRIMARY KEY,
+                case_id TEXT NOT NULL,
+                entity_id_1 TEXT NOT NULL,
+                entity_id_2 TEXT NOT NULL,
+                status TEXT DEFAULT 'unresolved',
+                resolved_by TEXT,
+                resolved_at TEXT,
+                notes TEXT
+            );
+            """)
+
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS document_indexing_status (
+                document_name TEXT,
+                case_id TEXT,
+                status TEXT DEFAULT 'indexing',
+                progress REAL DEFAULT 0.0,
+                status_message TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                PRIMARY KEY (document_name, case_id)
+            );
+            """)
+            conn.commit()
+            print("[Catalyst DB Client] Local migrations verified and applied.")
+        except Exception as e:
+            print(f"[Catalyst DB Client] Error running migrations: {e}")
+            raise e
+        finally:
+            conn.close()
 
     def execute(self, query: Any, params: dict = None) -> CatalystQueryResult:
         query_str = str(query).strip()

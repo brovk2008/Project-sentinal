@@ -703,90 +703,97 @@ def get_crime_patterns():
     Loads K-Means models and returns clustered police stations and crime groups,
     accompanied by statistical characteristics and XAI explanations.
     """
-    payload = load_patterns_payload()
-    station_df = payload["station_df"]
-    crime_df = payload["crime_df"]
-    cluster_labels = payload["cluster_labels"]
-    metrics = payload["metrics"]
+    try:
+        payload = load_patterns_payload()
+        station_df = payload["station_df"]
+        crime_df = payload["crime_df"]
+        cluster_labels = payload["cluster_labels"]
+        metrics = payload["metrics"]
 
-    # 1. Format station clusters
-    # Limit list size to 200 for clean visualization, sorting by volume
-    stations_list = []
-    for _, row in station_df.head(200).iterrows():
-        c_val = int(row["cluster"])
-        c_label = row["cluster_label"]
-        st_name = row["unit_name"]
-        
-        # Calculate cluster assignment confidence based on cluster proximity (mocked helper)
-        xai = explainability.explain_prediction(
-            "patterns",
-            c_label,
-            {
-                "name": st_name,
-                "type": "station",
+        # 1. Format station clusters
+        # Limit list size to 200 for clean visualization, sorting by volume
+        stations_list = []
+        for _, row in station_df.head(200).iterrows():
+            c_val = int(row["cluster"])
+            c_label = row["cluster_label"]
+            st_name = row["unit_name"]
+            
+            # Calculate cluster assignment confidence based on cluster proximity (mocked helper)
+            xai = explainability.explain_prediction(
+                "patterns",
+                c_label,
+                {
+                    "name": st_name,
+                    "type": "station",
+                    "total_firs": int(row["total_firs"]),
+                    "arrest_rate": float(row["arrest_rate"]),
+                    "conviction_rate": float(row["conviction_rate"]),
+                    "weekend_ratio": float(row["weekend_ratio"])
+                },
+                confidence=0.88
+            )
+            
+            stations_list.append({
+                "unit_id": int(row["unit_id"]),
+                "unit_name": st_name,
+                "district_name": row["district_name"],
+                "latitude": float(row["latitude"]),
+                "longitude": float(row["longitude"]),
                 "total_firs": int(row["total_firs"]),
                 "arrest_rate": float(row["arrest_rate"]),
                 "conviction_rate": float(row["conviction_rate"]),
-                "weekend_ratio": float(row["weekend_ratio"])
-            },
-            confidence=0.88
-        )
-        
-        stations_list.append({
-            "unit_id": int(row["unit_id"]),
-            "unit_name": st_name,
-            "district_name": row["district_name"],
-            "latitude": float(row["latitude"]),
-            "longitude": float(row["longitude"]),
-            "total_firs": int(row["total_firs"]),
-            "arrest_rate": float(row["arrest_rate"]),
-            "conviction_rate": float(row["conviction_rate"]),
-            "cluster": c_val,
-            "cluster_label": c_label,
-            "confidence": xai["confidence"],
-            "explanation": xai["explanation"],
-            "feature_importance": xai["feature_importance"]
-        })
+                "cluster": c_val,
+                "cluster_label": c_label,
+                "confidence": xai["confidence"],
+                "explanation": xai["explanation"],
+                "feature_importance": xai["feature_importance"]
+            })
 
-    # 2. Format crime group clusters
-    crimes_list = []
-    for _, row in crime_df.iterrows():
-        c_val = int(row["cluster"])
-        c_label = row["cluster_label"]
-        cg_name = row["crime_group_name"]
-        
-        xai = explainability.explain_prediction(
-            "patterns",
-            c_label,
-            {
-                "name": cg_name,
-                "type": "crime",
+        # 2. Format crime group clusters
+        crimes_list = []
+        for _, row in crime_df.iterrows():
+            c_val = int(row["cluster"])
+            c_label = row["cluster_label"]
+            cg_name = row["crime_group_name"]
+            
+            xai = explainability.explain_prediction(
+                "patterns",
+                c_label,
+                {
+                    "name": cg_name,
+                    "type": "crime",
+                    "total_firs": int(row["total_firs"]),
+                    "arrest_rate": float(row["arrest_rate"]),
+                    "conviction_rate": float(row["conviction_rate"]),
+                    "district_spread": int(row["district_spread"])
+                },
+                confidence=0.91
+            )
+            
+            crimes_list.append({
+                "crime_group_name": cg_name,
                 "total_firs": int(row["total_firs"]),
                 "arrest_rate": float(row["arrest_rate"]),
                 "conviction_rate": float(row["conviction_rate"]),
-                "district_spread": int(row["district_spread"])
-            },
-            confidence=0.91
-        )
-        
-        crimes_list.append({
-            "crime_group_name": cg_name,
-            "total_firs": int(row["total_firs"]),
-            "arrest_rate": float(row["arrest_rate"]),
-            "conviction_rate": float(row["conviction_rate"]),
-            "cluster": c_val,
-            "cluster_label": c_label,
-            "confidence": xai["confidence"],
-            "explanation": xai["explanation"],
-            "feature_importance": xai["feature_importance"]
-        })
+                "cluster": c_val,
+                "cluster_label": c_label,
+                "confidence": xai["confidence"],
+                "explanation": xai["explanation"],
+                "feature_importance": xai["feature_importance"]
+            })
 
-    return {
-        "metrics": metrics,
-        "cluster_archetypes": cluster_labels,
-        "stations": stations_list,
-        "crime_groups": crimes_list
-    }
+        return {
+            "metrics": metrics,
+            "cluster_archetypes": cluster_labels,
+            "stations": stations_list,
+            "crime_groups": crimes_list
+        }
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail={
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -799,40 +806,48 @@ def get_anomalies_feed():
     Returns a unified threat feed of crime count spikes, suspicious financial transactions,
     and demographic outlier districts, complete with XAI calibrations.
     """
-    raw_anoms = anomaly.get_all_anomalies()
-    enriched = []
-    
-    for raw in raw_anoms:
-        # Calibrate statistical inputs for XAI
-        is_anom = True
-        severity = raw.get("severity", "LOW")
-        val = 0.0
-        expected = 0.0
+    try:
+        raw_anoms = anomaly.get_all_anomalies()
+        enriched = []
         
-        if raw["type"] == "crime_spike":
-            val = float(raw["value"])
-            expected = float(raw["expected"])
-        elif raw["type"] == "financial_anomaly":
-            val = float(raw["velocity_score"] + raw["geo_anomaly_score"])
-            expected = 1.0 # Base threshold level
-        elif raw["type"] == "district_outlier":
-            val = abs(float(raw["anomaly_score"]))
-            expected = 0.1
+        for raw in raw_anoms:
+            # Calibrate statistical inputs for XAI
+            is_anom = True
+            severity = raw.get("severity", "LOW")
+            val = 0.0
+            expected = 0.0
             
-        xai = explainability.explain_prediction(
-            "anomaly",
-            is_anom,
-            {
-                "severity": severity,
-                "value": val,
-                "expected": expected
-            },
-            confidence=0.85
-        )
-        
-        raw["confidence"] = xai["confidence"]
-        raw["explanation"] = xai["explanation"]
-        raw["feature_importance"] = xai["feature_importance"]
-        enriched.append(raw)
-        
-    return enriched
+            if raw["type"] == "crime_spike":
+                val = float(raw["value"])
+                expected = float(raw["expected"])
+            elif raw["type"] == "financial_anomaly":
+                val = float(raw["velocity_score"] + raw["geo_anomaly_score"])
+                expected = 1.0 # Base threshold level
+            elif raw["type"] == "district_outlier":
+                val = abs(float(raw["anomaly_score"]))
+                expected = 0.1
+                
+            xai = explainability.explain_prediction(
+                "anomaly",
+                is_anom,
+                {
+                    "severity": severity,
+                    "value": val,
+                    "expected": expected
+                },
+                confidence=0.85
+            )
+            
+            raw["confidence"] = xai["confidence"]
+            raw["explanation"] = xai["explanation"]
+            raw["feature_importance"] = xai["feature_importance"]
+            enriched.append(raw)
+            
+        return enriched
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail={
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+

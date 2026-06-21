@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getApiBaseUrl } from '../config'
+import Topbar from '../components/Topbar.jsx'
 
 const API = `${getApiBaseUrl()}/api/v1/intelligence`
 
@@ -144,107 +145,60 @@ export default function IntelligenceAssistant() {
       })
   }
 
-  // Format confidence color
-  const getConfidenceColor = (score) => {
-    if (score === null || score === undefined) return 'var(--text-muted)'
-    if (score > 0.8) return 'var(--success)'
-    if (score > 0.5) return 'var(--warning)'
-    return 'var(--critical)'
-  }
+  const controls = (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span className="label-xs" style={{ color: 'var(--text-secondary)' }}>DB:</span>
+        <span className="mono" style={{ fontSize: 9, color: (health?.database || 'offline').toLowerCase() === 'connected' || (health?.database || 'offline').toLowerCase() === 'online' ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 500 }}>
+          {(health?.database || 'UNKNOWN').toUpperCase()}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span className="label-xs" style={{ color: 'var(--text-secondary)' }}>OLLAMA/GROQ:</span>
+        <span className="mono" style={{ fontSize: 9, color: (health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'var(--accent)' : 'var(--text-muted)', fontWeight: 500 }}>
+          {(health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'ONLINE' : 'OFFLINE'}
+        </span>
+      </div>
+    </div>
+  )
 
   return (
-    <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
-      
-      {/* LEFT PANEL: Chat Workstation */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
-        
-        {/* Workspace Title */}
-        <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--text-muted)' }}>INTELLIGENCE ASSISTANT // TERM-SENTINEL-v5.1</span>
-            <h2 style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>Hybrid RAG Operations Analyst</h2>
-          </div>
-          
-          {/* Health indicator badge */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>DB:</span>
-              <span style={{ fontSize: 10, color: (health?.database || 'offline').toLowerCase() === 'connected' || (health?.database || 'offline').toLowerCase() === 'online' ? 'var(--success)' : 'var(--critical)', fontWeight: 600 }}>
-                {(health?.database || 'UNKNOWN').toUpperCase()}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>OLLAMA/GROQ:</span>
-              <span style={{ fontSize: 10, color: (health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
-                {(health?.ollama_qwen_model || 'offline').toLowerCase() === 'available' || (health?.ollama_qwen_model || 'offline').toLowerCase() === 'online' ? 'ONLINE' : 'OFFLINE (FALLBACK)'}
-              </span>
-            </div>
-          </div>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden' }}>
+      <Topbar title="Intelligence Assistant" meta="HYBRID RAG // TERM-SENTINEL-v5.1" controls={controls} />
 
-        {/* Terminal Message Stream */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {messages.map((msg, index) => (
-            <div 
-              key={index}
-              style={{
-                alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: msg.sender === 'user' ? '70%' : '90%',
-                background: msg.sender === 'user' ? 'var(--bg-card)' : 'transparent',
-                border: msg.sender === 'user' ? '1px solid var(--border)' : 'none',
-                padding: msg.sender === 'user' ? '12px 16px' : '0px',
-                borderRadius: 4
-              }}
-            >
-              {msg.sender !== 'user' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: msg.isError ? 'var(--critical)' : 'var(--text-secondary)' }}>
-                    {msg.sender === 'system' ? 'SYSTEM_LOG' : 'SENTINEL_AI'}
-                  </span>
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{msg.timestamp}</span>
+      <div className="content">
+        {/* LEFT PANEL: Chat Workstation */}
+        <div className="terminal-page" style={{ flex: 1, borderRight: '1px solid var(--border)' }}>
+          {/* Terminal Message Stream */}
+          <div className="terminal-body">
+            {(messages || []).map((msg, index) => {
+              if (!msg) return null;
+              const role = msg.sender === 'user' ? 'INVESTIGATOR' : msg.sender === 'system' ? 'SYSTEM_LOG' : 'SENTINEL_AI';
+              return (
+                <div key={index} className={`term-msg ${msg.sender === 'user' ? 'user' : 'assistant'}`}>
+                  <div className="term-role">
+                    {role} · {msg.timestamp}
+                  </div>
+                  <div className="term-content" style={{ color: msg.isError ? 'var(--critical)' : undefined, whiteSpace: 'pre-wrap' }}>
+                    {msg.text}
+                  </div>
                 </div>
-              )}
-              
-              <div 
-                style={{ 
-                  fontSize: 13, 
-                  lineHeight: 1.6, 
-                  color: msg.isError ? 'var(--critical)' : 'var(--text-primary)',
-                  whiteSpace: 'pre-wrap',
-                  fontFamily: msg.sender === 'user' ? 'inherit' : 'inherit'
-                }}
-              >
-                {msg.text}
-              </div>
-              
-              {msg.sender === 'user' && (
-                <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>
-                  {msg.timestamp}
+              )
+            })}
+            {loading && (
+              <div className="term-msg assistant">
+                <div className="term-role">SENTINEL_AI · processing...</div>
+                <div className="term-content" style={{ color: 'var(--text-muted)' }}>
+                  Scanning vector index & analytics databases...
                 </div>
-              )}
-            </div>
-          ))}
-          {loading && (
-            <div style={{ alignSelf: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)' }}>SENTINEL_AI</span>
-                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>processing...</span>
               </div>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', height: 20 }}>
-                <span className="live-dot" style={{ background: 'var(--warning)' }} />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Scanning vector space & analytics databases...</span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-        {/* Input area */}
-        <div style={{ padding: 18, borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
-          
           {/* Quick recommendations */}
-          <div style={{ marginBottom: 12 }}>
-            <div className="label-xs" style={{ marginBottom: 6 }}>Suggested Intelligence Directives</div>
+          <div style={{ padding: '8px 18px 0', background: 'var(--bg-base)' }}>
+            <div className="label-xs" style={{ marginBottom: 6 }}>Suggested Directives</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {sampleQuestions.map(sq => (
                 <button
@@ -252,22 +206,21 @@ export default function IntelligenceAssistant() {
                   onClick={() => executeIntelligenceQuery(sq.q)}
                   disabled={loading}
                   style={{
-                    background: 'var(--bg-card)',
+                    background: 'transparent',
                     border: '1px solid var(--border)',
-                    color: 'var(--text-secondary)',
-                    padding: '4px 10px',
-                    fontSize: 10,
-                    borderRadius: 3,
+                    color: 'var(--text-dim)',
+                    padding: '4px 8px',
+                    fontSize: '9.5px',
+                    fontFamily: 'JetBrains Mono, monospace',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease'
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border-focus)'
+                    e.currentTarget.style.borderColor = 'var(--border-mid)'
                     e.currentTarget.style.color = 'var(--text-primary)'
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.borderColor = 'var(--border)'
-                    e.currentTarget.style.color = 'var(--text-secondary)'
+                    e.currentTarget.style.color = 'var(--text-dim)'
                   }}
                 >
                   {sq.label}
@@ -276,171 +229,146 @@ export default function IntelligenceAssistant() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', alignSelf: 'center', color: 'var(--text-muted)', fontSize: 14 }}>&gt;</span>
+          {/* Input form */}
+          <form onSubmit={handleSubmit} className="terminal-input-area">
+            <span className="term-caret">&gt;</span>
             <input
               type="text"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask a question (e.g. 'Show crime trends in Bengaluru' or 'counter-terrorism rules')"
               disabled={loading}
-              style={{
-                flex: 1,
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                padding: '10px 14px',
-                color: 'var(--text-primary)',
-                fontSize: 13,
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--border-focus)'}
-              onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+              className="term-input"
             />
             <button
               type="submit"
               disabled={loading}
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                padding: '0 20px',
-                borderRadius: 4,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="term-send"
             >
-              QUERY
+              <i className="ti ti-send" />
             </button>
           </form>
         </div>
 
-      </div>
-
-      {/* RIGHT SIDEBAR: Metadata Viewer / Evidence Inspector */}
-      <div style={{ width: 320, background: 'var(--bg-panel)', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        
-        {/* Title */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div className="label-xs">Evidence Inspector</div>
-          <h3 style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: 'var(--text-primary)' }}>RAG Analysis Metadata</h3>
-        </div>
-
-        {/* Section 1: Intent Routing */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div className="label-xs" style={{ marginBottom: 6 }}>Intent Router Path</div>
-          <div 
-            className="mono" 
-            style={{ 
-              background: 'var(--bg-primary)', 
-              border: '1px solid var(--border)', 
-              padding: '6px 10px', 
-              fontSize: 11,
-              borderRadius: 3,
-              color: (activeMetadata?.mode || 'idle') === 'db_analytics_sql' ? 'var(--warning)' : (activeMetadata?.mode || 'idle') === 'llm_grounded' ? 'var(--success)' : 'var(--text-primary)',
-              fontWeight: 700
-            }}
-          >
-            {(activeMetadata?.mode || 'IDLE').toUpperCase()}
+        {/* RIGHT SIDEBAR: Metadata Viewer / Evidence Inspector */}
+        <div className="ai-sidebar" style={{ width: 320 }}>
+          {/* Title */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div className="label-xs">Evidence Inspector</div>
+            <h3 style={{ fontSize: 11.5, fontWeight: 500, marginTop: 4, color: 'var(--text-primary)' }}>RAG Analysis Metadata</h3>
           </div>
-          <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
-            {(activeMetadata?.mode || 'idle') === 'db_analytics_sql' && 'Query directly executed as an optimized PostgreSQL analytics query (<1s).'}
-            {(activeMetadata?.mode || 'idle') === 'llm_grounded' && 'Query processed via hybrid document retrieval and synthesized locally via Qwen2.5-1.5B.'}
-            {(activeMetadata?.mode || 'idle') === 'fallback_retrieval_only' && 'Ollama offline. Running retrieval-only fallback output with citations.'}
-            {(activeMetadata?.mode || 'idle') === 'idle' && 'Await directive input to execute routing decision.'}
-          </p>
-        </div>
 
-        {/* Section 2: Confidence Indicator */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div className="label-xs" style={{ marginBottom: 6 }}>Source Confidence Index</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ 
-              fontSize: 24, 
-              fontFamily: 'JetBrains Mono, monospace', 
-              fontWeight: 800, 
-              color: getConfidenceColor(activeMetadata?.confidence) 
-            }}>
-              {activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${Math.round(activeMetadata.confidence * 100)}%` : '--'}
+          {/* Section 1: Intent Routing */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div className="label-xs" style={{ marginBottom: 6 }}>Intent Router Path</div>
+            <div 
+              className="mono" 
+              style={{ 
+                background: 'var(--bg-base)', 
+                border: '1px solid var(--border)', 
+                padding: '6px 10px', 
+                fontSize: 10.5,
+                color: (activeMetadata?.mode || 'idle') === 'db_analytics_sql' ? 'var(--accent)' : (activeMetadata?.mode || 'idle') === 'llm_grounded' ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontWeight: 500
+              }}
+            >
+              {(activeMetadata?.mode || 'IDLE').toUpperCase()}
             </div>
-            
-            <div style={{ flex: 1, height: 6, background: 'var(--bg-primary)', borderRadius: 3, border: '1px solid var(--border)', overflow: 'hidden' }}>
-              <div 
-                style={{ 
-                  height: '100%', 
-                  background: getConfidenceColor(activeMetadata?.confidence), 
-                  width: activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${activeMetadata.confidence * 100}%` : '0%' 
-                }} 
-              />
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+              {(activeMetadata?.mode || 'idle') === 'db_analytics_sql' && 'Executed directly as an optimized database SQL analytics query (<1s).'}
+              {(activeMetadata?.mode || 'idle') === 'llm_grounded' && 'Synthesized via hybrid document retrieval and Groq API completion.'}
+              {(activeMetadata?.mode || 'idle') === 'fallback_retrieval_only' && 'Running retrieval-only fallback output with citations.'}
+              {(activeMetadata?.mode || 'idle') === 'idle' && 'Await directive input to execute routing decision.'}
+            </p>
+          </div>
+
+          {/* Section 2: Confidence Indicator */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div className="label-xs" style={{ marginBottom: 6 }}>Source Confidence Index</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ 
+                fontSize: 25, 
+                fontFamily: 'Inter, sans-serif', 
+                fontWeight: 300, 
+                color: activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? 'var(--accent)' : 'var(--text-muted)'
+              }}>
+                {activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${Math.round(activeMetadata.confidence * 100)}%` : '--'}
+              </div>
+              
+              <div className="risk-bar-wrap">
+                <div 
+                  className="risk-bar-fill" 
+                  style={{ 
+                    background: 'var(--accent)',
+                    width: activeMetadata?.confidence !== null && activeMetadata?.confidence !== undefined ? `${activeMetadata.confidence * 100}%` : '0%' 
+                  }} 
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Section 3: Database Analytics Context */}
-        {activeMetadata?.analytics_data && (
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-primary)' }}>
-            <div className="label-xs" style={{ marginBottom: 6 }}>SQL Analytics Payload</div>
-            <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 3 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                    {(activeMetadata.analytics_data?.columns || []).map(col => (
-                      <th key={col} style={{ padding: '4px 6px', color: 'var(--text-secondary)' }}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(activeMetadata.analytics_data?.data || []).map((row, rIdx) => (
-                    <tr key={rIdx} style={{ borderBottom: '1px solid var(--border)' }}>
+          {/* Section 3: Database Analytics Context */}
+          {activeMetadata?.analytics_data && (
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-base)' }}>
+              <div className="label-xs" style={{ marginBottom: 6 }}>SQL Analytics Payload</div>
+              <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 3 }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
                       {(activeMetadata.analytics_data?.columns || []).map(col => (
-                        <td key={col} className="mono" style={{ padding: '4px 6px', color: 'var(--text-primary)' }}>{String(row && col ? row[col] : '')}</td>
+                        <th key={col}>{col}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Section 4: Document Evidence Sources */}
-        <div style={{ padding: '16px 20px', flex: 1 }}>
-          <div className="label-xs" style={{ marginBottom: 8 }}>Retrieved Document Contexts</div>
-          
-          {(activeMetadata?.sources || []).length === 0 ? (
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
-              No document evidence active for current log.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(activeMetadata?.sources || []).map((src, sIdx) => (
-                <div 
-                  key={sIdx}
-                  style={{
-                    background: 'var(--bg-primary)',
-                    border: '1px solid var(--border)',
-                    padding: 8,
-                    borderRadius: 3
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span className="mono" style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {(src || 'UNKNOWN')}
-                    </span>
-                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>DOC_{sIdx + 1}</span>
-                  </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                    Primary reference source file matched during pgvector vector similarity scan.
-                  </div>
-                </div>
-              ))}
+                  </thead>
+                  <tbody>
+                    {(activeMetadata.analytics_data?.data || []).map((row, rIdx) => (
+                      <tr key={rIdx}>
+                        {(activeMetadata.analytics_data?.columns || []).map(col => (
+                          <td key={col} className="mono">{String(row && col ? row[col] : '')}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-        </div>
 
+          {/* Section 4: Document Evidence Sources */}
+          <div style={{ padding: '16px 20px', flex: 1 }}>
+            <div className="label-xs" style={{ marginBottom: 8 }}>Retrieved Document Contexts</div>
+            
+            {(activeMetadata?.sources || []).length === 0 ? (
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
+                No active references.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {(activeMetadata?.sources || []).map((src, sIdx) => (
+                  <div 
+                    key={sIdx}
+                    style={{
+                      background: 'var(--bg-base)',
+                      border: '1px solid var(--border)',
+                      padding: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span className="mono" style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                        {(src || 'UNKNOWN')}
+                      </span>
+                      <span className="mono" style={{ fontSize: 8, color: 'var(--text-muted)' }}>REF_{sIdx + 1}</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      Reference source matched during vector similarity retrieval search.
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      
     </div>
   )
 }

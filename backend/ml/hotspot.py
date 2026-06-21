@@ -175,8 +175,8 @@ def train_and_evaluate():
     X_train, y_train = train_df[features], train_df['is_spike']
     X_val, y_val = val_df[features], val_df['is_spike']
     
-    # Initialize classifiers
-    rf = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42, n_jobs=-1)
+    # Initialize classifiers with balanced class weights to address data imbalance
+    rf = RandomForestClassifier(n_estimators=50, max_depth=10, class_weight='balanced', random_state=42, n_jobs=-1)
     
     # Train
     rf.fit(X_train, y_train)
@@ -184,11 +184,32 @@ def train_and_evaluate():
     # Predict
     rf_pred = rf.predict(X_val)
     
-    # Evaluate F1-score
+    # Evaluate F1-score and classification details
+    from sklearn.metrics import classification_report, precision_score, recall_score
+    from sklearn.model_selection import StratifiedKFold, cross_val_score
+    
     rf_f1 = f1_score(y_val, rf_pred, zero_division=0)
+    precision = precision_score(y_val, rf_pred, zero_division=0)
+    recall = recall_score(y_val, rf_pred, zero_division=0)
+    
+    # Stratified 5-Fold Cross-Validation for robustness checking
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    cv_scores = cross_val_score(rf, df_feat[features], df_feat['is_spike'], cv=cv, scoring='f1', n_jobs=-1)
+    cv_mean = float(cv_scores.mean())
+    cv_std = float(cv_scores.std())
+    
+    print("\n--- Model Classification Report ---")
+    print(classification_report(y_val, rf_pred, zero_division=0))
+    print(f"5-Fold Cross-Validation F1 Score: {cv_mean:.4f} ± {cv_std:.4f}\n")
     
     metrics = {
-        "RandomForest": {"f1": float(rf_f1)}
+        "RandomForest": {
+            "f1": float(rf_f1),
+            "precision": float(precision),
+            "recall": float(recall),
+            "cv_mean": cv_mean,
+            "cv_std": cv_std
+        }
     }
     
     chosen_model_name = "RandomForest"
@@ -220,7 +241,7 @@ def train_and_evaluate():
     model_path = os.path.join(MODEL_DIR, "hotspot_model.joblib")
     joblib.dump(model_payload, model_path)
     
-    print(f"Hotspot Model Trained. Chosen: {chosen_model_name} (F1: {chosen_f1:.4f})")
+    print(f"Hotspot Model Trained. Chosen: {chosen_model_name} (F1: {chosen_f1:.4f}, CV-Mean: {cv_mean:.4f})")
     return model_payload
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getApiBaseUrl } from '../config'
+import Topbar from '../components/Topbar.jsx'
 
 const API = `${getApiBaseUrl()}/api/v1/heatmap`
 
@@ -15,6 +16,7 @@ function fmt(n) {
 export default function CrimeHeatmap() {
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
+  const tileLayerRef = useRef(null)
   const layersRef = useRef({ heatmap: null, choropleth: null, stations: null })
 
   const [crimeGroups, setCrimeGroups] = useState([])
@@ -24,6 +26,15 @@ export default function CrimeHeatmap() {
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({ points: 0, districts: 0, stations: 0 })
   const [hoverDistrict, setHoverDistrict] = useState(null)
+  const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark')
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setTheme(e.detail)
+    }
+    window.addEventListener('themechange', handleThemeChange)
+    return () => window.removeEventListener('themechange', handleThemeChange)
+  }, [])
 
   // Init map
   useEffect(() => {
@@ -35,13 +46,29 @@ export default function CrimeHeatmap() {
       attributionControl: false
     })
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18
-    }).addTo(map)
-
     mapInstance.current = map
-    return () => { map.remove(); mapInstance.current = null }
+    return () => { 
+      map.remove()
+      mapInstance.current = null 
+    }
   }, [])
+
+  // Update tile layer based on theme
+  useEffect(() => {
+    const map = mapInstance.current
+    if (!map) return
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current)
+    }
+    const tileUrl = theme === 'dark' 
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    
+    tileLayerRef.current = L.tileLayer(tileUrl, {
+      maxZoom: 18,
+      attribution: '© CartoDB'
+    }).addTo(map)
+  }, [theme])
 
   // Load crime groups
   useEffect(() => {
@@ -79,7 +106,7 @@ export default function CrimeHeatmap() {
 
           const circles = data.map(d => {
             const ratio = d.intensity / maxI
-            const color = ratio > 0.7 ? '#ef4444' : ratio > 0.4 ? '#f97316' : ratio > 0.15 ? '#fbbf24' : '#38bdf8'
+            const color = ratio > 0.7 ? '#c8814a' : ratio > 0.4 ? '#d59663' : ratio > 0.15 ? '#e2ab7d' : '#f0c197'
             const radius = Math.max(800, ratio * 5000)
             return L.circle([d.lat, d.lng], {
               radius,
@@ -111,13 +138,12 @@ export default function CrimeHeatmap() {
           const layer = L.geoJSON(geojson, {
             style: feature => {
               const ratio = feature.properties.crime_count / maxC
-              const r = Math.round(8 + ratio * 230)
-              const g = Math.round(30 - ratio * 30)
-              const b = Math.round(40 - ratio * 30)
+              // Visual styling matching the selected theme colors
+              const opacityVal = 0.3 + ratio * 0.5
               return {
-                fillColor: `rgb(${r},${g},${b})`,
-                fillOpacity: 0.7,
-                color: '#1e2d45',
+                fillColor: '#c8814a',
+                fillOpacity: opacityVal,
+                color: theme === 'dark' ? '#1c1c22' : '#d8d3cd',
                 weight: 1.5
               }
             },
@@ -149,11 +175,11 @@ export default function CrimeHeatmap() {
           const markers = data.map(st => {
             const maxFirs = Math.max(...data.map(d => d.fir_count), 1)
             const ratio = st.fir_count / maxFirs
-            const color = ratio > 0.6 ? '#ef4444' : ratio > 0.3 ? '#f97316' : '#38bdf8'
+            const color = ratio > 0.6 ? '#c8814a' : ratio > 0.3 ? '#d59663' : '#f0c197'
             const icon = L.divIcon({
               html: `<div style="width:${8 + ratio*16}px;height:${8 + ratio*16}px;
-                background:${color};border-radius:50%;border:2px solid white;
-                box-shadow:0 0 ${4 + ratio*8}px ${color};opacity:0.9;"></div>`,
+                background:${color};border-radius:50%;border:1.5px solid white;
+                opacity:0.9;"></div>`,
               className: '',
               iconAnchor: [8, 8]
             })
@@ -175,76 +201,70 @@ export default function CrimeHeatmap() {
 
   const years = ['', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024']
 
-  return (
+  const metaText = `POSTGIS · ${stats.points > 0 ? fmt(stats.points) + ' grid cells' : stats.districts > 0 ? stats.districts + ' districts' : stats.stations > 0 ? stats.stations + ' stations' : '—'}`
+
+  const controls = (
     <>
-      <div className="page-header">
-        <h2>🗺️ Crime Heatmap — Karnataka<span className="badge">LIVE DATA · 1.67M FIRs</span></h2>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>PostGIS · {stats.points > 0 ? fmt(stats.points) + ' grid cells' : stats.districts > 0 ? stats.districts + ' districts' : stats.stations > 0 ? stats.stations + ' stations' : '—'}</div>
+      <span className="filter-label">View</span>
+      <div className="seg">
+        {[['grid','Density Grid'],['choropleth','Choropleth'],['stations','Stations']].map(([v,l]) => (
+          <button key={v} id={`view-${v}`} className={`seg-btn ${viewMode===v?'active':''}`} onClick={() => setViewMode(v)}>{l}</button>
+        ))}
       </div>
+      <span className="filter-label">Group</span>
+      <select id="filter-crime-group" className="tb-select" value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
+        <option value="">All Crimes</option>
+        {crimeGroups.map(g => <option key={g} value={g}>{g}</option>)}
+      </select>
+      <span className="filter-label">Year</span>
+      <select id="filter-year" className="tb-select" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ minWidth: 90 }}>
+        {years.map(y => <option key={y} value={y}>{y || 'All Years'}</option>)}
+      </select>
+      {loading && <span style={{ fontSize: 10, color: 'var(--accent)' }}>⏳ Loading…</span>}
+    </>
+  )
 
-      <div className="filter-row">
-        <span className="filter-label">View</span>
-        <div className="toggle-group" style={{ width: 280 }}>
-          {[['grid','🔥 Density Grid'],['choropleth','🗺 Choropleth'],['stations','📍 Stations']].map(([v,l]) => (
-            <button key={v} id={`view-${v}`} className={`toggle-btn ${viewMode===v?'active':''}`} onClick={() => setViewMode(v)}>{l}</button>
-          ))}
-        </div>
-        <span className="filter-label">Crime Group</span>
-        <select id="filter-crime-group" className="filter-select" value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}>
-          <option value="">All Crimes</option>
-          {crimeGroups.map(g => <option key={g} value={g}>{g}</option>)}
-        </select>
-        <span className="filter-label">Year</span>
-        <select id="filter-year" className="filter-select" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={{ minWidth: 90 }}>
-          {years.map(y => <option key={y} value={y}>{y || 'All Years'}</option>)}
-        </select>
-        {loading && <span style={{ fontSize: 11, color: 'var(--accent-blue)' }}>⏳ Loading…</span>}
-      </div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+      <Topbar title="Crime Heatmap — Karnataka" meta={metaText} controls={controls} />
 
-      <div className="heatmap-layout">
-        <div className="heatmap-sidebar">
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Stats</div>
+      <div className="content">
+        <div className="data-panel">
+          <div className="dp-section">Quick Stats</div>
           {[
-            { label: 'Total FIRs', value: '1.67M', icon: '📋' },
-            { label: 'Districts', value: '30', icon: '🏙️' },
-            { label: 'Stations', value: '1,074', icon: '🏠' },
-            { label: 'Crime Types', value: '626', icon: '📊' },
+            { label: 'Total FIRs', value: '1.67M', icon: 'ti-clipboard' },
+            { label: 'Districts', value: '30', icon: 'ti-building' },
+            { label: 'Stations', value: '1,074', icon: 'ti-home' },
+            { label: 'Crime Types', value: '626', icon: 'ti-chart-bar' },
           ].map(s => (
-            <div key={s.label} style={{ padding: '10px 12px', background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 18, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: 'var(--accent-blue)' }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginTop: 2 }}>{s.label}</div>
+            <div key={s.label} className="stat">
+              <div className="stat-num">{s.value}</div>
+              <div className="stat-label"><i className={`ti ${s.icon}`} style={{ marginRight: 4 }} />{s.label}</div>
             </div>
           ))}
 
           {hoverDistrict && (
-            <div style={{ padding: '12px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--accent-blue)', marginTop: 4 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-blue)', marginBottom: 8 }}>{hoverDistrict.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
+              <div className="dc-name" style={{ color: 'var(--accent)', fontWeight: 500, fontSize: 11 }}>{hoverDistrict.name}</div>
+              <div className="dc-val" style={{ fontSize: 9.5, color: 'var(--text-secondary)', marginTop: 4 }}>
                 <div>FIRs: <span className="mono" style={{ color: 'var(--text-primary)' }}>{hoverDistrict.crime_count?.toLocaleString()}</span></div>
-                <div>Violent: <span className="mono" style={{ color: 'var(--accent-red)' }}>{hoverDistrict.violent_count?.toLocaleString()}</span></div>
-                <div>Financial: <span className="mono" style={{ color: 'var(--accent-purple)' }}>{hoverDistrict.financial_count?.toLocaleString()}</span></div>
+                <div>Violent: <span className="mono" style={{ color: 'var(--accent)' }}>{hoverDistrict.violent_count?.toLocaleString()}</span></div>
+                <div>Financial: <span className="mono" style={{ color: 'var(--text-primary)' }}>{hoverDistrict.financial_count?.toLocaleString()}</span></div>
               </div>
             </div>
           )}
-
-          <div style={{ marginTop: 'auto' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Data source: Karnataka State Police FIR Records 2016–2024. PostGIS spatial indexing active.
-            </div>
-          </div>
         </div>
 
-        <div className="heatmap-map-container">
-          <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+        <div className="map-wrap">
+          <div ref={mapRef} className="map-container" />
 
           {viewMode === 'grid' && (
             <div className="map-legend">
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Crime Density</div>
-              {[['#ef4444','Very High (1000+)'],['#f97316','High (500+)'],['#fbbf24','Medium (100+)'],['#38bdf8','Low (<100)']].map(([c,l]) => (
-                <div key={c} className="map-legend-item">
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                  <span>{l}</span>
+              <div className="legend-txt" style={{ fontWeight: 500, marginBottom: 4 }}>Crime Density</div>
+              {[['#c8814a','Very High (1000+)'],['#d59663','High (500+)'],['#e2ab7d','Medium (100+)'],['#f0c197','Low (<100)']].map(([c,l]) => (
+                <div key={c} className="legend-row">
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: c }} />
+                  <span className="legend-txt">{l}</span>
                 </div>
               ))}
             </div>
@@ -252,17 +272,17 @@ export default function CrimeHeatmap() {
 
           {viewMode === 'choropleth' && (
             <div className="map-legend">
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.8px' }}>FIR Count</div>
-              {[['rgb(238,30,30)','High'],['rgb(178,15,20)','Medium'],['rgb(80,10,15)','Low']].map(([c,l]) => (
-                <div key={c} className="map-legend-item">
-                  <div style={{ width: 16, height: 12, borderRadius: 3, background: c, flexShrink: 0 }} />
-                  <span>{l}</span>
+              <div className="legend-txt" style={{ fontWeight: 500, marginBottom: 4 }}>FIR Count</div>
+              {[['#c8814a','High'],['#d59663','Medium'],['#f0c197','Low']].map(([c,l]) => (
+                <div key={c} className="legend-row">
+                  <div style={{ width: 16, height: 12, borderRadius: 3, background: c }} />
+                  <span className="legend-txt">{l}</span>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
-    </>
+    </div>
   )
 }

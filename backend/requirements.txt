@@ -13,4 +13,7 @@ sentence-transformers>=2.2.0
 PyMuPDF>=1.22.0
 exceptiongroup
 zcatalyst_sdk
+pyarrow
+pyshp
+
 
